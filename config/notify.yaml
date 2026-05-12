@@ -1,0 +1,24 @@
+# 通知配置 —— 邮件 + 飞书 webhook
+# 凭据均通过环境变量注入，避免泄露到 git
+#
+# 邮件：EMAIL_PASSWORD（SMTP 授权码 / 应用专用密码）
+# 飞书：FEISHU_WEBHOOK（自定义机器人 webhook URL）
+#
+# 任一项 enabled=false 即跳过该渠道；全 false 等于"只生成本地 HTML"
+
+email:
+  enabled: false
+  smtp_host: smtp.qq.com           # 例: smtp.gmail.com / smtp.163.com / smtp.qq.com
+  smtp_port: 465
+  use_ssl: true                    # 465 用 SSL；587 用 STARTTLS 时改 false
+  username: example@qq.com         # 登录用户名（多数情况等于发件地址）
+  from_addr: example@qq.com
+  to_addrs:
+    - example@qq.com               # 收件人，支持多个
+  subject_prefix: "[newsCollector] 每日资讯"
+
+feishu:
+  enabled: false
+  # 自定义机器人 webhook URL 走环境变量 FEISHU_WEBHOOK
+  # 模式: text (纯文本) / card (交互卡片，含可点击链接)
+  mode: card

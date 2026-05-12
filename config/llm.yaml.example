@@ -1,0 +1,25 @@
+# LLM 配置 —— 走 OpenAI 兼容接口，DeepSeek / Kimi / OpenAI 通用
+#
+# 用法:
+#   1. 复制为 config/llm.yaml 后填入你的 api_key
+#   2. 或者保留此处 api_key 为空，改用环境变量 LLM_API_KEY 提供
+#
+# 三种常见服务商示例:
+#
+# === DeepSeek (默认) ===
+base_url: https://api.deepseek.com/v1
+model: deepseek-chat
+#
+# === Moonshot Kimi ===
+# base_url: https://api.moonshot.cn/v1
+# model: moonshot-v1-8k
+#
+# === OpenAI ===
+# base_url: https://api.openai.com/v1
+# model: gpt-4o-mini
+
+# 留空 = 必须用环境变量 LLM_API_KEY
+api_key: ""
+
+top_k_per_keyword: 2
+max_candidates_per_keyword: 30

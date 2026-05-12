@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>每日资讯 · {{ date }}</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    max-width: 760px;
+    margin: 32px auto;
+    padding: 0 18px;
+    color: #222;
+    line-height: 1.65;
+    background: #fafafa;
+  }
+  .header {
+    border-bottom: 2px solid #333;
+    padding-bottom: 10px;
+    margin-bottom: 24px;
+  }
+  .header h1 { margin: 0; font-size: 22px; }
+  .header .meta { color: #888; font-size: 13px; margin-top: 4px; }
+  h2 {
+    font-size: 18px;
+    margin-top: 32px;
+    margin-bottom: 4px;
+    color: #1a73e8;
+    border-left: 4px solid #1a73e8;
+    padding-left: 10px;
+  }
+  h2 .count { color: #aaa; font-weight: normal; font-size: 13px; margin-left: 6px; }
+  .empty { color: #aaa; font-style: italic; padding: 8px 0 8px 14px; }
+  .item {
+    background: #fff;
+    padding: 14px 18px;
+    margin: 10px 0;
+    border-radius: 6px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+  .item-title { font-size: 16px; font-weight: 600; line-height: 1.4; }
+  .item-title a { color: #1a0dab; text-decoration: none; }
+  .item-title a:hover { text-decoration: underline; }
+  .item-title a:visited { color: #6c1399; }
+  .item-meta { color: #888; font-size: 12px; margin: 6px 0 8px 0; }
+  .badge-official {
+    display: inline-block; background: #e8f5e9; color: #2e7d32;
+    padding: 1px 6px; border-radius: 3px; font-size: 11px; margin-left: 6px;
+    vertical-align: middle;
+  }
+  .badge-rss { color: #6a8a3a; font-size: 11px; }
+  .badge-llm { color: #b07a2a; font-size: 11px; }
+  .badge-translated { color: #5b6ee1; font-size: 11px; }
+  .item-summary { color: #333; font-size: 14px; }
+  .footer { color: #aaa; font-size: 12px; text-align: center; margin-top: 40px; padding-top: 16px; border-top: 1px solid #eee; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <h1>每日资讯 · {{ date }}</h1>
+    <div class="meta">窗口 {{ window_from }} ~ {{ window_to }} · 共 {{ total }} 条</div>
+  </div>
+
+  {% for kw, picks in grouped.items() %}
+  <h2>{{ kw }} <span class="count">{{ picks|length }} 条</span></h2>
+  {% if not picks %}
+    <div class="empty">— 无足够重要的资讯</div>
+  {% else %}
+    {% for p in picks %}
+    <div class="item">
+      <div class="item-title">
+        <a href="{{ p.url }}" target="_blank" rel="noopener">{{ p.display_title or p.title }}</a>
+        {% if p.is_official %}<span class="badge-official">官方</span>{% endif %}
+      </div>
+      {% if p.display_title and p.display_title != p.title %}
+      <div class="item-orig-title" style="color:#999;font-size:12px;margin-top:2px;">原标题: {{ p.title }}</div>
+      {% endif %}
+      <div class="item-meta">
+        {{ p.source }} · {{ p.published[:16] }}
+        {% if p.summary_source == 'rss' %}· <span class="badge-rss">原文摘要</span>
+        {% elif p.summary_source == 'llm' %}· <span class="badge-llm">LLM 生成</span>{% endif %}
+        {% if p.translated %}· <span class="badge-translated">已翻译</span>{% endif %}
+      </div>
+      <div class="item-summary">{{ p.summary }}</div>
+    </div>
+    {% endfor %}
+  {% endif %}
+  {% endfor %}
+
+  <div class="footer">newsCollector · generated {{ generated_at }}</div>
+</body>
+</html>

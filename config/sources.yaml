@@ -1,0 +1,38 @@
+# RSS 源列表 —— type=keyword_search 的会用每个关键词替换 {q}
+sources:
+  # ===== 全局源（直接拉，不按关键词）=====
+  - name: HackerNews Frontpage
+    type: rss
+    url: https://hnrss.org/frontpage?points=100
+    category: tech
+
+  - name: Reddit r/MachineLearning
+    type: rss
+    url: https://www.reddit.com/r/MachineLearning/.rss
+    category: ml
+
+  - name: Reddit r/LocalLLaMA
+    type: rss
+    url: https://www.reddit.com/r/LocalLLaMA/.rss
+    category: ml
+
+  - name: arXiv cs.AI
+    type: rss
+    url: http://export.arxiv.org/rss/cs.AI
+    category: paper
+
+  - name: arXiv cs.LG
+    type: rss
+    url: http://export.arxiv.org/rss/cs.LG
+    category: paper
+
+  # ===== 关键词搜索源（按关键词逐个拉）=====
+  - name: Google News
+    type: keyword_search
+    url: https://news.google.com/rss/search?q={q}&hl=en-US&gl=US&ceid=US:en
+    category: news
+
+  - name: HN Search
+    type: keyword_search
+    url: https://hnrss.org/newest?q={q}
+    category: tech
