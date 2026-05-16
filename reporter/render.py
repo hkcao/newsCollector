@@ -6,6 +6,31 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+# 与 core.ranker.CATEGORIES 保持一致的展示顺序
+_CATEGORY_ORDER = ["公司新闻", "政策走向", "学术论文", "技术解读"]
+
+
+def _group_by_category(
+    grouped: dict[str, list[dict]],
+) -> dict[str, list[dict]]:
+    """把按关键词分组的结果重排成按 llm_category 分组，并给每条带上 matched_kw。"""
+    bucket: dict[str, list[dict]] = {c: [] for c in _CATEGORY_ORDER}
+    for kw, picks in grouped.items():
+        for p in picks:
+            item = dict(p)
+            item["matched_kw"] = kw
+            cat = p.get("llm_category") or "技术解读"
+            bucket.setdefault(cat, []).append(item)
+    # 丢掉空类别，未知类别附在最后
+    out: dict[str, list[dict]] = {}
+    for c in _CATEGORY_ORDER:
+        if bucket.get(c):
+            out[c] = bucket[c]
+    for c, items in bucket.items():
+        if c not in _CATEGORY_ORDER and items:
+            out[c] = items
+    return out
+
 
 def render_html(
     grouped: dict[str, list[dict]],
@@ -14,7 +39,8 @@ def render_html(
 ) -> str:
     """返回渲染后的 HTML 字符串。
 
-    grouped 中每条 item 需要含: title, url, source, published, summary
+    grouped: 按关键词分组的 dict；模板内按 llm_category 重新聚合呈现。
+    每条 item 需要含: title, url, source, published, summary, llm_category
     """
     tpl_dir = Path(__file__).parent / "templates"
     env = Environment(
@@ -23,9 +49,11 @@ def render_html(
     )
     tpl = env.get_template("daily.html")
     total = sum(len(v) for v in grouped.values())
+    by_category = _group_by_category(grouped)
     now = datetime.now()
     return tpl.render(
         grouped=grouped,
+        by_category=by_category,
         total=total,
         window_from=window_from,
         window_to=window_to,

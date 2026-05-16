@@ -91,27 +91,61 @@ def recency_boost(item: dict) -> float:
 
 def compute_score(item: dict) -> float:
     """
-    综合打分（值域大致 0~1.5）：
+    综合打分（值域大致 0~2.0），聚合所有源能给出的客观信号：
 
-      0.30 * log10(points+1) + 0.10 * log10(comments+1)   # 绝对热度
-    + 0.30 * log10(delta_24h+1)                            # 24h 增量
-    + 0.15 * log10(cross_source_count)                     # 多源同时报道 (v0.3)
-    + 0.15 * recency_boost                                 # 越新越靠前
+      0.25 * log10(points+1) + 0.08 * log10(comments+1)    # HN 绝对热度
+    + 0.25 * log10(delta_24h+1)                            # HN 24h 增量
+    + 0.20 * log2(cross_source_count)                      # 多源同时报道（最强 cross-check）
+    + 0.15 * tavily_score                                  # Tavily 自带相关性分（0~1）
+    + 0.07 * recency_boost                                 # 越新越靠前
 
-    取 log 是为了把 HN points 这种数量级（几到几千）压到可比尺度，
-    既奖励 100k 级别的大热点，也不让一篇 5000 分把今天 200 分的盖掉太多。
+    取 log 是为了把 HN points / cross_source 这类离散数量压到可比尺度。
+    cross_source_count 用 log2（增长快）：被两个源同时报道权重明显高于单源，
+    被 5 个源覆盖的事件权重接近 HN 1000 分。
+
+    Tavily 没有 HN 那种绝对热度，但 Tavily 自己有一个 0~1 的相关性分（topic=news 的"是否值得当新闻看"
+    的判断），作为兜底信号，避免 Tavily-only 条目客观分永远为 0。
     """
     sig = item.get("signals", {})
     points = sig.get("points", 0)
     comments = sig.get("comments", 0)
     delta = sig.get("delta_24h", 0)
     cross = sig.get("cross_source_count", 1)
+    tavily = sig.get("tavily_score") or 0.0
 
-    abs_term = 0.30 * math.log10(points + 1) + 0.10 * math.log10(comments + 1)
-    delta_term = 0.30 * math.log10(delta + 1)
-    cross_term = 0.15 * math.log10(max(cross, 1))
-    rec_term = 0.15 * recency_boost(item)
-    return abs_term + delta_term + cross_term + rec_term
+    abs_term = 0.25 * math.log10(points + 1) + 0.08 * math.log10(comments + 1)
+    delta_term = 0.25 * math.log10(delta + 1)
+    cross_term = 0.20 * math.log2(max(cross, 1) + 1)  # +1 防止 1 → log2(1)=0
+    tavily_term = 0.15 * float(tavily)
+    rec_term = 0.07 * recency_boost(item)
+    return abs_term + delta_term + cross_term + tavily_term + rec_term
+
+
+def _normalize_title(title: str) -> str:
+    """跨源同事件检测用：小写 + 去标点 + 折叠空白。粗糙但够用。"""
+    t = (title or "").lower()
+    t = re.sub(r"[\s\W_]+", " ", t, flags=re.UNICODE)
+    return t.strip()
+
+
+def compute_cross_source_count(items: list[dict]) -> None:
+    """原地给每个 item 的 signals 写入 cross_source_count = 同标题在多少个不同源出现。
+
+    用 normalized title 作为聚合 key。同一篇报道在 HN / Reddit / Google News / Tavily
+    多重出现时，标题大概率一致或近似，能被聚合到一起。
+    """
+    title_sources: dict[str, set[str]] = {}
+    for it in items:
+        key = _normalize_title(it.get("title", ""))
+        if not key:
+            continue
+        src = (it.get("source") or "").split("(")[0].strip()
+        title_sources.setdefault(key, set()).add(src)
+    for it in items:
+        key = _normalize_title(it.get("title", ""))
+        sig = dict(it.get("signals", {}))
+        sig["cross_source_count"] = len(title_sources.get(key, {"."}))
+        it["signals"] = sig
 
 
 # ---------- 主流程 ----------
@@ -146,6 +180,10 @@ def normalize(
             it["signals"] = sig
             db.upsert(it, now_iso)
         db.commit()
+
+    # 跨源聚合：在所有命中条目里数一遍同标题出现在多少个源（包括 HN / Reddit / Google
+    # News / Tavily），写进 cross_source_count 后再打分
+    compute_cross_source_count(matched)
 
     for it in matched:
         it["score"] = compute_score(it)

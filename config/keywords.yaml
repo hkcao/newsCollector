@@ -1,35 +1,58 @@
-# 用户关键词配置 —— 可手动编辑，或用 CLI --keywords 临时覆盖
-# 每个关键词可选配:
-#   aliases:           同义词列表
-#   case_sensitive:    大小写敏感 (默认 false)。多词专有名词建议开启，避免与日常短语撞车
-#   official_domains:  该关键词的官方域名白名单。命中的条目会被标 [官方]，
-#                      LLM 排序时会优先官方源，避免转载/二次报道导致的时效性问题
-#
-# 全局默认官方平台 (无需配置): arxiv.org (论文)、github.com (代码 release)
 keywords:
-  - name: NVIDIA
-    aliases: [nvda, 英伟达, H100, H200, Blackwell, CUDA]
-    official_domains:
-      - nvidia.com
-      - nvidianews.nvidia.com
-      - blogs.nvidia.com
-      - developer.nvidia.com
-      - nvlabs.github.io          # NVIDIA Research / NVlabs 项目页
-
-  - name: VAST Data
-    case_sensitive: true
-    aliases: [VAST数据, vastdata.com]
-    official_domains:
-      - vastdata.com
-
-  - name: vLLM
-    case_sensitive: true
-    aliases: []
-    official_domains:
-      - blog.vllm.ai
-      - docs.vllm.ai
-      - vllm-project.github.io
-
-  - name: speculative decoding
-    aliases: [spec decoding, draft model]
-    # 主要在 arXiv / github 上首发，靠全局默认即可
+- name: NVIDIA
+  aliases:
+  - nvda
+  - 英伟达
+  - H100
+  - H200
+  - Blackwell
+  - CUDA
+  official_domains:
+  - nvidia.com
+  - nvidianews.nvidia.com
+  - blogs.nvidia.com
+  - developer.nvidia.com
+  - nvlabs.github.io
+- name: VAST Data
+  case_sensitive: true
+  aliases:
+  - VAST数据
+  - vastdata.com
+  official_domains:
+  - vastdata.com
+  - www.vastdata.com
+- name: vLLM
+  case_sensitive: true
+  official_domains:
+  - vllm.ai
+  - blog.vllm.ai
+  - docs.vllm.ai
+  - vllm-project.github.io
+- name: DeepSeek
+  aliases:
+  - deepseek-ai
+  - DeepSeek-V3
+  - DeepSeek-R1
+  - 深度求索
+  official_domains:
+  - deepseek.com
+  - www.deepseek.com
+  - api-docs.deepseek.com
+  - huggingface.co/deepseek-ai
+- name: speculative decoding
+  aliases:
+  - spec decoding
+  - draft model
+  - 推测解码
+- name: Kimi
+  aliases:
+  - kimi
+  - KIMI
+  official_domains:
+  - www.kimi.com
+- name: NetAPP
+  aliases:
+  - netapp
+- name: AIDP
+  aliases:
+  - AI数据平台，AI  dataplatform

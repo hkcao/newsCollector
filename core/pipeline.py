@@ -52,6 +52,7 @@ def collect_news(
     use_all: bool = False,
     use_llm: bool = True,
     update_last_run: bool = True,
+    user_preference: str | None = None,
     log: Callable[[str], None] = _noop,
 ) -> dict:
     """执行完整流程，返回:
@@ -95,7 +96,7 @@ def collect_news(
     if use_llm and items and llm_cfg is not None:
         log("[3/5] LLM 按重要性筛选 (top_k 每关键词)…")
         log(f"  模型: {llm_cfg['model']}  base_url: {llm_cfg.get('base_url') or 'OpenAI default'}")
-        grouped_raw = rank_all(items, keywords, llm_cfg)
+        grouped_raw = rank_all(items, keywords, llm_cfg, user_preference=user_preference)
 
         log("[4/5] 摘要选择 (RSS 优先) + URL 解码…")
         for picks in grouped_raw.values():

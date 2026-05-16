@@ -1,6 +1,9 @@
-# RSS 源列表 —— type=keyword_search 的会用每个关键词替换 {q}
+# RSS / 搜索源列表
+#   type=rss              直接拉，整体抓后再做关键词匹配
+#   type=keyword_search   每个关键词替换 {q}，逐次请求（RSS）
+#   type=tavily           走 Tavily Search API，每个关键词查一次（需 TAVILY_API_KEY）
 sources:
-  # ===== 全局源（直接拉，不按关键词）=====
+  # ===== 全局源 =====
   - name: HackerNews Frontpage
     type: rss
     url: https://hnrss.org/frontpage?points=100
@@ -26,7 +29,31 @@ sources:
     url: http://export.arxiv.org/rss/cs.LG
     category: paper
 
-  # ===== 关键词搜索源（按关键词逐个拉）=====
+  # ===== 官方一手源 =====
+  # 直接订阅关键公司/项目的官方博客，避开 Google News 的二手转载，保证时效与准确性
+  - name: vLLM Blog
+    type: rss
+    url: https://vllm.ai/blog/rss.xml
+    category: official
+
+  - name: NVIDIA Developer Blog
+    type: rss
+    url: https://developer.nvidia.com/blog/feed
+    category: official
+
+  - name: NVIDIA Blogs
+    type: rss
+    url: https://blogs.nvidia.com/feed/
+    category: official
+
+  - name: VAST Data Press
+    type: rss
+    url: https://www.vastdata.com/rss/press.xml
+    category: official
+
+  # 注：DeepSeek 官方暂未暴露 RSS，靠 Tavily / Google News + official_domains 兜底
+
+  # ===== 关键词搜索源 =====
   - name: Google News
     type: keyword_search
     url: https://news.google.com/rss/search?q={q}&hl=en-US&gl=US&ceid=US:en
@@ -36,3 +63,13 @@ sources:
     type: keyword_search
     url: https://hnrss.org/newest?q={q}
     category: tech
+
+  # Tavily：接近浏览器搜索的覆盖度（含国内/官方/非主流站）；免费档约 1000 次/月
+  # 启用前 `export TAVILY_API_KEY=tvly-xxx`，否则该源会被跳过（不影响其他源）
+  - name: Tavily News
+    type: tavily
+    api_key_env: TAVILY_API_KEY
+    category: news
+    days: 2          # 查询近 N 天，pipeline 会用 since 再过滤一次
+    max_results: 10  # 每个关键词最多返回多少条
+    topic: news      # news | general

@@ -33,7 +33,11 @@ from collectors.url_decoder import decode_items_inplace
 from core.db import DB
 from core.normalizer import normalize
 from core.ranker import load_llm_config, rank_all, translate_all, verify_all
+from core.secrets import load_secrets
 from core.summary import clean_rss_summary
+
+# 启动时加载本地持久化的密钥（TAVILY_API_KEY 等）
+load_secrets()
 from reporter.notify import load_notify_config, notify_all
 from reporter.render import render_html, write_report
 
@@ -117,13 +121,15 @@ def print_llm(grouped: dict[str, list[dict]]):
             continue
         for j, it in enumerate(picks, 1):
             badge = " [官方]" if it.get("is_official") else ""
+            cat = it.get("llm_category", "")
+            cat_badge = f" [{cat}]" if cat else ""
             tag = it.get("summary_source", "?")
             if it.get("verified"):
                 tag += "+自检改写"
             if it.get("translated"):
                 tag += "+翻译"
             disp = it.get("display_title") or it["title"]
-            print(f"  [{j}]{badge} {disp}")
+            print(f"  [{j}]{badge}{cat_badge} {disp}")
             if disp != it["title"]:
                 print(f"      原标题: {it['title']}")
             print(f"      📄 ({tag}) {it.get('summary','')}")
@@ -147,6 +153,7 @@ def flatten_to_render(grouped_raw: dict[str, list[dict]]) -> dict[str, list[dict
                 "summary_source": p.get("summary_source", ""),
                 "verified": p.get("verified", False),
                 "translated": p.get("translated", False),
+                "llm_category": p.get("llm_category", ""),
             }
             for p in picks
         ]

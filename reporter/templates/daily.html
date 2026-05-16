@@ -2,91 +2,286 @@
 <html lang="zh">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>每日资讯 · {{ date }}</title>
 <style>
+  :root {
+    --bg: #fafbfc;
+    --surface: #ffffff;
+    --border: #e6e8eb;
+    --border-strong: #d0d4d8;
+    --fg: #0d1117;
+    --fg-muted: #57606a;
+    --fg-dim: #8b949e;
+    --accent: #0969da;
+    --accent-soft: #ddf4ff;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --border-strong: #444c56;
+      --fg: #e6edf3;
+      --fg-muted: #9da7b1;
+      --fg-dim: #6e7681;
+      --accent: #58a6ff;
+      --accent-soft: #1f2d3d;
+    }
+  }
   * { box-sizing: border-box; }
+  html, body { background: var(--bg); }
   body {
-    font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-    max-width: 760px;
-    margin: 32px auto;
-    padding: 0 18px;
-    color: #222;
-    line-height: 1.65;
-    background: #fafafa;
+    font-family: -apple-system, "SF Pro Text", "Segoe UI", "PingFang SC",
+                 "Microsoft YaHei", system-ui, sans-serif;
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+    color: var(--fg);
+    line-height: 1.6;
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
   }
-  .header {
-    border-bottom: 2px solid #333;
+
+  /* ---------- Header ---------- */
+  .header { margin-bottom: 40px; }
+  .header .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg-dim);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .header h1 {
+    margin: 0;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .header h1 .date-chip {
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--accent);
+    margin-left: 10px;
+    padding: 2px 8px;
+    background: var(--accent-soft);
+    border-radius: 4px;
+    vertical-align: 2px;
+  }
+  .header .meta {
+    margin-top: 12px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--fg-muted);
+  }
+  .header .meta .sep { opacity: 0.4; margin: 0 8px; }
+
+  /* ---------- TOC ---------- */
+  .toc {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 20px 0 32px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+  }
+  .toc a {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--fg-muted);
+    text-decoration: none;
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    transition: all 0.12s;
+  }
+  .toc a:hover { color: var(--accent); border-color: var(--border-strong); }
+  .toc a .n { color: var(--fg-dim); margin-left: 4px; }
+
+  /* ---------- Category section ---------- */
+  .cat-section { margin: 40px 0 0; }
+  .cat-header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
     padding-bottom: 10px;
-    margin-bottom: 24px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--border);
   }
-  .header h1 { margin: 0; font-size: 22px; }
-  .header .meta { color: #888; font-size: 13px; margin-top: 4px; }
-  h2 {
+  .cat-header .marker {
+    width: 8px; height: 8px;
+    border-radius: 2px;
+    display: inline-block;
+  }
+  .cat-公司新闻 .marker { background: #0969da; }
+  .cat-政策走向 .marker { background: #cf222e; }
+  .cat-学术论文 .marker { background: #8250df; }
+  .cat-技术解读 .marker { background: #bf8700; }
+  .cat-header h2 {
+    margin: 0;
     font-size: 18px;
-    margin-top: 32px;
-    margin-bottom: 4px;
-    color: #1a73e8;
-    border-left: 4px solid #1a73e8;
-    padding-left: 10px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
   }
-  h2 .count { color: #aaa; font-weight: normal; font-size: 13px; margin-left: 6px; }
-  .empty { color: #aaa; font-style: italic; padding: 8px 0 8px 14px; }
+  .cat-header .count {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--fg-dim);
+  }
+
+  /* ---------- Item card ---------- */
   .item {
-    background: #fff;
-    padding: 14px 18px;
-    margin: 10px 0;
-    border-radius: 6px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    padding: 16px 0;
+    border-bottom: 1px solid var(--border);
   }
-  .item-title { font-size: 16px; font-weight: 600; line-height: 1.4; }
-  .item-title a { color: #1a0dab; text-decoration: none; }
-  .item-title a:hover { text-decoration: underline; }
-  .item-title a:visited { color: #6c1399; }
-  .item-meta { color: #888; font-size: 12px; margin: 6px 0 8px 0; }
-  .badge-official {
-    display: inline-block; background: #e8f5e9; color: #2e7d32;
-    padding: 1px 6px; border-radius: 3px; font-size: 11px; margin-left: 6px;
-    vertical-align: middle;
+  .item:last-child { border-bottom: none; }
+  .item-title {
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.4;
+    margin-bottom: 6px;
   }
-  .badge-rss { color: #6a8a3a; font-size: 11px; }
-  .badge-llm { color: #b07a2a; font-size: 11px; }
-  .badge-translated { color: #5b6ee1; font-size: 11px; }
-  .item-summary { color: #333; font-size: 14px; }
-  .footer { color: #aaa; font-size: 12px; text-align: center; margin-top: 40px; padding-top: 16px; border-top: 1px solid #eee; }
+  .item-title a {
+    color: var(--fg);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.12s;
+  }
+  .item-title a:hover {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+  .item-orig-title {
+    color: var(--fg-dim);
+    font-size: 12px;
+    font-family: var(--mono);
+    margin-bottom: 6px;
+  }
+  .item-meta {
+    color: var(--fg-muted);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    margin-bottom: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+  .item-meta .source { color: var(--fg-muted); }
+  .item-meta .time { color: var(--fg-dim); }
+  .item-meta .dot { color: var(--fg-dim); opacity: 0.6; }
+
+  .chip {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 3px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    line-height: 1.6;
+    border: 1px solid var(--border-strong);
+    color: var(--fg-muted);
+    background: transparent;
+  }
+  .chip.kw {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .chip.official {
+    color: #1a7f37;
+    border-color: #1a7f37;
+  }
+  .chip.rss { color: #6a8a3a; border-color: #a6c168; }
+  .chip.llm { color: #b07a2a; border-color: #d4a14e; }
+  .chip.translated { color: #5b6ee1; border-color: #8a9bee; }
+
+  .item-summary {
+    color: var(--fg);
+    font-size: 14.5px;
+    line-height: 1.7;
+  }
+
+  /* ---------- Footer ---------- */
+  .footer {
+    margin-top: 64px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg-dim);
+    letter-spacing: 0.04em;
+  }
+  .footer .brand { color: var(--fg-muted); }
 </style>
 </head>
 <body>
   <div class="header">
-    <h1>每日资讯 · {{ date }}</h1>
-    <div class="meta">窗口 {{ window_from }} ~ {{ window_to }} · 共 {{ total }} 条</div>
+    <div class="eyebrow">// Tech Daily Digest</div>
+    <h1>每日资讯<span class="date-chip">{{ date }}</span></h1>
+    <div class="meta">
+      <span>window</span>
+      <span class="sep">›</span>
+      <span>{{ window_from }} → {{ window_to }}</span>
+      <span class="sep">·</span>
+      <span>{{ total }} items</span>
+      <span class="sep">·</span>
+      <span>{{ by_category|length }} categories</span>
+    </div>
   </div>
 
-  {% for kw, picks in grouped.items() %}
-  <h2>{{ kw }} <span class="count">{{ picks|length }} 条</span></h2>
-  {% if not picks %}
-    <div class="empty">— 无足够重要的资讯</div>
-  {% else %}
-    {% for p in picks %}
-    <div class="item">
+  {% if by_category %}
+  <nav class="toc">
+    {% for cat, items in by_category.items() %}
+      <a href="#cat-{{ loop.index }}">{{ cat }}<span class="n">{{ items|length }}</span></a>
+    {% endfor %}
+  </nav>
+  {% endif %}
+
+  {% for cat, items in by_category.items() %}
+  <section id="cat-{{ loop.index }}" class="cat-section cat-{{ cat }}">
+    <div class="cat-header">
+      <span class="marker"></span>
+      <h2>{{ cat }}</h2>
+      <span class="count">{{ items|length }} 条</span>
+    </div>
+    {% for p in items %}
+    <article class="item">
       <div class="item-title">
         <a href="{{ p.url }}" target="_blank" rel="noopener">{{ p.display_title or p.title }}</a>
-        {% if p.is_official %}<span class="badge-official">官方</span>{% endif %}
       </div>
       {% if p.display_title and p.display_title != p.title %}
-      <div class="item-orig-title" style="color:#999;font-size:12px;margin-top:2px;">原标题: {{ p.title }}</div>
+      <div class="item-orig-title">⤷ {{ p.title }}</div>
       {% endif %}
       <div class="item-meta">
-        {{ p.source }} · {{ p.published[:16] }}
-        {% if p.summary_source == 'rss' %}· <span class="badge-rss">原文摘要</span>
-        {% elif p.summary_source == 'llm' %}· <span class="badge-llm">LLM 生成</span>{% endif %}
-        {% if p.translated %}· <span class="badge-translated">已翻译</span>{% endif %}
+        <span class="source">{{ p.source }}</span>
+        <span class="dot">·</span>
+        <span class="time">{{ p.published[:16] }}</span>
+        {% if p.matched_kw %}<span class="chip kw">#{{ p.matched_kw }}</span>{% endif %}
+        {% if p.is_official %}<span class="chip official">官方</span>{% endif %}
+        {% if p.summary_source == 'rss' %}<span class="chip rss">原文摘要</span>
+        {% elif p.summary_source == 'llm' %}<span class="chip llm">LLM 生成</span>{% endif %}
+        {% if p.translated %}<span class="chip translated">已翻译</span>{% endif %}
       </div>
       <div class="item-summary">{{ p.summary }}</div>
-    </div>
+    </article>
     {% endfor %}
-  {% endif %}
+  </section>
   {% endfor %}
 
-  <div class="footer">newsCollector · generated {{ generated_at }}</div>
+  {% if not by_category %}
+  <div style="color: var(--fg-dim); text-align: center; padding: 40px 0; font-family: var(--mono); font-size: 13px;">
+    — no items in this window —
+  </div>
+  {% endif %}
+
+  <div class="footer">
+    <span class="brand">newsCollector</span> · generated {{ generated_at }}
+  </div>
 </body>
 </html>
