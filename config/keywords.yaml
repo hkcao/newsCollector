@@ -1,58 +1,1243 @@
+# ===========================================================================
+# AI 存储技术规划 —— 关键词清单
+# 目标读者：AI 存储技术规划与分析师
+# 选词原则：能影响 AI 训练/推理存储栈（容量、带宽、延迟、$/GB、生态兼容）的
+#           厂商、产品、协议、开源项目、概念，统统纳入。
+# ===========================================================================
+
 keywords:
+
+# ===== AI 存储厂商（含官方域名，权威首发优先） =====
+- name: VAST Data
+  case_sensitive: true
+  aliases:
+  - VAST数据
+  - VAST 数据平台
+  - vastdata
+  - DASE
+  - InsightEngine
+  official_domains:
+  - vastdata.com
+  - www.vastdata.com
+
+- name: WEKA
+  case_sensitive: true
+  aliases:
+  - WekaIO
+  - Weka.IO
+  - WekaFS
+  - WEKApod
+  - NeuralMesh
+  official_domains:
+  - weka.io
+  - www.weka.io
+
+- name: DDN
+  case_sensitive: true
+  aliases:
+  - DataDirect Networks
+  - EXAScaler
+  - Infinia
+  - A³I
+  - AI400X
+  official_domains:
+  - ddn.com
+  - www.ddn.com
+
+- name: Pure Storage
+  aliases:
+  - PureStorage
+  - PSTG
+  - FlashBlade
+  - FlashArray
+  - Portworx
+  - DirectFlash
+  official_domains:
+  - purestorage.com
+  - blog.purestorage.com
+
+- name: NetApp
+  aliases:
+  - NTAP
+  - ONTAP
+  - AFF
+  - BlueXP
+  - StorageGRID
+  - 网件
+  official_domains:
+  - netapp.com
+  - www.netapp.com
+  - bluexp.netapp.com
+
+- name: Hammerspace
+  case_sensitive: true
+  aliases:
+  - Global Data Environment
+  - GDE
+  official_domains:
+  - hammerspace.com
+
+- name: IBM Storage
+  aliases:
+  - Storage Scale
+  - Spectrum Scale
+  - GPFS
+  - IBM ESS
+  - Storage Fusion
+  - IBM Cloud Object Storage
+  official_domains:
+  - ibm.com/storage
+  - www.ibm.com/storage
+
+- name: Dell Storage
+  aliases:
+  - PowerScale
+  - PowerStore
+  - PowerMax
+  - Isilon
+  - ObjectScale
+  - Dell AI Factory
+  official_domains:
+  - dell.com
+  - www.dell.com
+  - infohub.delltechnologies.com
+
+- name: HPE Storage
+  aliases:
+  - Cray ClusterStor
+  - Alletra
+  - GreenLake for File
+  - HPE Private Cloud AI
+  official_domains:
+  - hpe.com
+  - www.hpe.com
+
+- name: Huawei Storage
+  aliases:
+  - 华为存储
+  - OceanStor
+  - OceanProtect
+  - DCS AI
+  - FusionStorage
+  official_domains:
+  - huawei.com
+  - e.huawei.com
+  - support.huawei.com
+
+- name: Inspur Storage
+  aliases:
+  - 浪潮存储
+  - AS13000
+  - 浪潮信息
+  official_domains:
+  - inspur.com
+  - www.inspur.com
+
+- name: MEGREZ
+  aliases:
+  - 曙光存储
+  - ParaStor
+  - Sugon
+
+# ===== 开源 / 并行文件系统 =====
+- name: Lustre
+  case_sensitive: true
+  aliases:
+  - LustreFS
+  - OpenSFS
+  official_domains:
+  - lustre.org
+  - wiki.lustre.org
+
+- name: Ceph
+  aliases:
+  - CephFS
+  - RADOS
+  - RBD
+  - RGW
+  official_domains:
+  - ceph.io
+  - docs.ceph.com
+
+- name: DAOS
+  case_sensitive: true
+  aliases:
+  - Distributed Asynchronous Object Storage
+  official_domains:
+  - daos.io
+  - docs.daos.io
+
+- name: BeeGFS
+  case_sensitive: true
+  official_domains:
+  - beegfs.io
+  - www.beegfs.io
+
+- name: JuiceFS
+  case_sensitive: true
+  aliases:
+  - juicedata
+  official_domains:
+  - juicefs.com
+  - www.juicefs.com
+
+- name: Alluxio
+  case_sensitive: true
+  official_domains:
+  - alluxio.io
+  - www.alluxio.io
+
+- name: MinIO
+  case_sensitive: true
+  aliases:
+  - AIStor
+  official_domains:
+  - min.io
+  - blog.min.io
+
+- name: 3FS
+  case_sensitive: true
+  aliases:
+  - DeepSeek 3FS
+  - Fire-Flyer File System
+
+# ===== GPU IO / 数据通路 =====
+- name: GPUDirect
+  aliases:
+  - GDS
+  - GPUDirect Storage
+  - GPUDirect RDMA
+  - Magnum IO
+  official_domains:
+  - developer.nvidia.com
+  - docs.nvidia.com
+
+- name: NVMe-oF
+  aliases:
+  - NVMe over Fabrics
+  - NVMe over TCP
+  - NVMe/TCP
+  - NVMe over RoCE
+
+- name: RDMA
+  aliases:
+  - RoCE
+  - RoCEv2
+  - iWARP
+  - InfiniBand
+  - IB
+
+- name: NIXL
+  case_sensitive: true
+  aliases:
+  - NVIDIA Inference Xfer Library
+
+# ===== 内存与互联（影响 AI 存储分层） =====
+- name: CXL
+  case_sensitive: true
+  aliases:
+  - Compute Express Link
+  - CXL 3.0
+  - CXL 3.1
+  - memory pooling
+  - 内存池化
+  official_domains:
+  - computeexpresslink.org
+
+- name: HBM
+  case_sensitive: true
+  aliases:
+  - HBM3
+  - HBM3E
+  - HBM4
+  - High Bandwidth Memory
+
+- name: NVLink
+  case_sensitive: true
+  aliases:
+  - NVSwitch
+  - NVLink Fusion
+  - NVL72
+  - NVL144
+
+- name: Ultra Ethernet
+  aliases:
+  - UEC
+  - Ultra Ethernet Consortium
+  - UALink
+  - Spectrum-X
+  - Quantum-X
+
+# ===== 推理/训练存储原语（KV cache / checkpoint） =====
+- name: KV Cache
+  aliases:
+  - KV-cache
+  - KVCache
+  - paged attention
+  - PagedAttention
+  - prefix cache
+  - prefix caching
+  - 前缀缓存
+  - KV 缓存
+  - KV offload
+
+- name: LMCache
+  case_sensitive: true
+  official_domains:
+  - lmcache.ai
+  - blog.lmcache.ai
+
+- name: Mooncake
+  case_sensitive: true
+  aliases:
+  - Mooncake Store
+  - Kimi Mooncake
+
+- name: checkpoint
+  # 裸 "checkpoint" 也太通用（passport checkpoint / security checkpoint /
+  # immigration checkpoint 都会撞），只接受携带上下文的完整短语
+  case_sensitive: true
+  match_aliases_only: true
+  aliases:
+  - checkpointing
+  - distributed checkpoint
+  - checkpoint resume
+  - checkpoint loading
+  - model checkpoint
+  - training checkpoint
+  - async checkpoint
+  - asynchronous checkpoint
+  - checkpoint sharding
+  - sharded checkpoint
+  - checkpoint compression
+  - DCP
+  - PyTorch DCP
+  - TorchSnapshot
+  - Nebula checkpoint
+  - 模型检查点
+  - 训练检查点
+  - 分布式检查点
+  - 异步检查点
+
+# ===== 数据平台 / Lakehouse / 向量库 =====
+- name: AI Data Platform
+  aliases:
+  - AIDP
+  - AI 数据平台
+  - AI dataplatform
+  - AI data fabric
+  - data lakehouse for AI
+
+- name: Iceberg
+  case_sensitive: true
+  aliases:
+  - Apache Iceberg
+  - Iceberg REST catalog
+  official_domains:
+  - iceberg.apache.org
+
+- name: Vector Database
+  aliases:
+  - vector db
+  - vector store
+  - vector index
+  - 向量数据库
+  - vector search
+  - ANN index
+
+- name: Milvus
+  case_sensitive: true
+  aliases:
+  - Zilliz
+  - Milvus 2
+  official_domains:
+  - milvus.io
+  - zilliz.com
+
+- name: Pinecone
+  case_sensitive: true
+  official_domains:
+  - pinecone.io
+  - www.pinecone.io
+
+- name: Weaviate
+  case_sensitive: true
+  official_domains:
+  - weaviate.io
+
+- name: Qdrant
+  case_sensitive: true
+  official_domains:
+  - qdrant.tech
+
+- name: Chroma
+  case_sensitive: true
+  match_aliases_only: true
+  aliases:
+  - ChromaDB
+  - Chroma DB
+  - trychroma
+  official_domains:
+  - trychroma.com
+
+# Lance：向量原生列式格式 + LanceDB，AI 训练/检索新范式
+- name: Lance
+  case_sensitive: true
+  match_aliases_only: true
+  aliases:
+  - LanceDB
+  - Lance format
+  - lakehouse for AI
+  - Arrow Lance
+  official_domains:
+  - lancedb.com
+  - lancedb.github.io
+
+- name: S3 Express
+  aliases:
+  - S3 Express One Zone
+  - S3 directory bucket
+  - S3 Tables
+  - S3 Vectors
+
+# ===== 关键 AI 基础设施厂商（与存储深度耦合） =====
 - name: NVIDIA
   aliases:
-  - nvda
   - 英伟达
+  - NVDA
   - H100
   - H200
+  - B100
+  - B200
+  - GB200
+  - GB300
   - Blackwell
-  - CUDA
+  - Rubin
+  - DGX
   official_domains:
   - nvidia.com
   - nvidianews.nvidia.com
   - blogs.nvidia.com
   - developer.nvidia.com
   - nvlabs.github.io
-- name: VAST Data
+
+# BlueField / DOCA：DPU + 存储卸载，对 AI 存储 IO 路径直接影响
+- name: BlueField
   case_sensitive: true
   aliases:
-  - VAST数据
-  - vastdata.com
+  - BlueField-2
+  - BlueField-3
+  - BlueField-4
+  - DOCA
+  - NVIDIA DPU
   official_domains:
-  - vastdata.com
-  - www.vastdata.com
+  - developer.nvidia.com
+  - docs.nvidia.com
+
+# Spectrum-X / Quantum-X：NVIDIA 存储/AI 网络栈
+- name: Spectrum-X
+  case_sensitive: true
+  aliases:
+  - Spectrum X
+  - SpectrumX
+  - Quantum-X
+  - QuantumX
+  - Spectrum-X Ethernet
+  official_domains:
+  - nvidia.com
+  - developer.nvidia.com
+
+# SuperPOD / DGX Cloud：参考架构，含存储认证（VAST/WEKA/DDN 都通过它进 NVIDIA 生态）
+- name: SuperPOD
+  case_sensitive: true
+  aliases:
+  - DGX SuperPOD
+  - DGX Cloud
+  - SuperPod
+  - NVIDIA Cloud Partner
+  - NCP
+  official_domains:
+  - nvidia.com
+  - blogs.nvidia.com
+
 - name: vLLM
   case_sensitive: true
+  aliases:
+  - vllm-project
   official_domains:
   - vllm.ai
   - blog.vllm.ai
   - docs.vllm.ai
-  - vllm-project.github.io
+
+- name: SGLang
+  case_sensitive: true
+  official_domains:
+  - sgl-project.github.io
+
 - name: DeepSeek
   aliases:
   - deepseek-ai
   - DeepSeek-V3
   - DeepSeek-R1
+  - DeepSeek-V3.2
   - 深度求索
   official_domains:
   - deepseek.com
-  - www.deepseek.com
   - api-docs.deepseek.com
   - huggingface.co/deepseek-ai
+
+# ===== 国内云厂商（存储/AI 基建强相关） =====
+- name: Alibaba Cloud
+  aliases:
+  - 阿里云
+  - alibabacloud
+  - PAI
+  - CPFS
+  - OSS
+  - 盘古
+  official_domains:
+  - alibabacloud.com
+  - www.aliyun.com
+
+- name: Tencent Cloud
+  aliases:
+  - 腾讯云
+  - TencentCloud
+  - GooseFS
+  - CFS Turbo
+  - Tencent COS
+  official_domains:
+  - cloud.tencent.com
+
+- name: ByteDance
+  aliases:
+  - 字节跳动
+  - 火山引擎
+  - Volcengine
+  - veFaaS
+  - VePFS
+  - veImageX
+  official_domains:
+  - volcengine.com
+
+- name: Baidu Cloud
+  aliases:
+  - 百度智能云
+  - PFS
+  - 沧海存储
+  official_domains:
+  - cloud.baidu.com
+
+# ===== 电信运营商算力 / 智算中心（AI 售卖新渠道） =====
+# 注意：keyword_search 类型源（Google News / HN Search / Tavily）只用 name 去搜，
+# 所以 name 必须是搜索引擎最容易召回的具体词；其余三家运营商和场景短语放进 aliases
+# 用于本地 RSS 匹配。
+- name: 中国电信
+  aliases:
+  - China Telecom
+  - 天翼云
+  - ctyun
+  - 中国移动
+  - China Mobile
+  - 移动云
+  - 中国联通
+  - China Unicom
+  - 联通云
+  - 运营商算力
+  - token 套餐
+  - 算力套餐
+  - 智算中心
+  - 智算云
+  official_domains:
+  - chinatelecom.com.cn
+  - ctyun.cn
+  - chinamobile.com
+  - ecloud.10086.cn
+  - chinaunicom.com
+
+# ===== MaaS / 推理经济学（token 计价、推理服务商业化） =====
+# 注意：裸 "MaaS" 会撞 "Malware as a Service"，所以走 match_aliases_only，
+# name 仅作显示，匹配只看下方明确指向"模型/推理服务"的短语
+- name: MaaS
+  case_sensitive: true
+  match_aliases_only: true
+  aliases:
+  - Model as a Service
+  - 模型即服务
+  - inference pricing
+  - 推理定价
+  - 推理服务
+  - API pricing
+  - token pricing
+  - tokens per dollar
+  - cost per million tokens
+  - $/M tokens
+  - $/M token
+  - 百万 tokens
+  - 百万 token
+
+# ===== 海外超大规模云（针对 AI 存储产品） =====
+- name: AWS Storage
+  aliases:
+  - FSx for Lustre
+  - FSx for OpenZFS
+  - S3 Express
+  - EFS
+  - SageMaker HyperPod
+  official_domains:
+  - aws.amazon.com
+
+- name: Azure Storage
+  aliases:
+  - Azure Managed Lustre
+  - AMLFS
+  - Azure NetApp Files
+  - ANF
+  - Blob
+  official_domains:
+  - azure.microsoft.com
+
+- name: Google Cloud Storage
+  aliases:
+  - GCS
+  - Parallelstore
+  - Hyperdisk ML
+  - Anywhere Cache
+  - Cloud Storage FUSE
+  official_domains:
+  - cloud.google.com
+
+# ===== 行业概念（用于跨厂商比较 / 趋势观察） =====
+- name: AI factory
+  aliases:
+  - AI 工厂
+  - AI cluster
+  - SuperPOD
+  - reference architecture
+
 - name: speculative decoding
   aliases:
   - spec decoding
   - draft model
   - 推测解码
+
+- name: disaggregated inference
+  aliases:
+  - prefill/decode disaggregation
+  - PD disaggregation
+  - 分离式推理
+  - 解耦式推理
+
+# ===== AI 存储基准 / 评测体系（分析师选型硬通货） =====
+- name: MLPerf Storage
+  case_sensitive: true
+  match_aliases_only: true
+  aliases:
+  - MLPerf Storage
+  - MLPerf Training
+  - MLPerf Inference
+  - MLPerf Client
+  - MLPerf 测评
+  - MLPerf benchmark
+  - MLPerf score
+  official_domains:
+  - mlcommons.org
+
+- name: IO500
+  case_sensitive: true
+  aliases:
+  - io-500
+  - io500.org
+  official_domains:
+  - io500.org
+
+- name: SPECstorage
+  case_sensitive: true
+  aliases:
+  - SPEC storage
+  - SPECstorage Solution
+  - SPEC ML
+  - SPECsfs
+  official_domains:
+  - spec.org
+
+- name: DLIO
+  case_sensitive: true
+  match_aliases_only: true
+  aliases:
+  - DLIO benchmark
+  - DLIO workload
+  - argonne DLIO
+
+- name: STAC-AI
+  case_sensitive: true
+  aliases:
+  - STAC AI
+  - STAC-ML
+  official_domains:
+  - stacresearch.com
+
+# ===== Computational Storage / SSD 新特性 =====
+- name: Computational Storage
+  aliases:
+  - CSD
+  - CSP
+  - computational SSD
+  - 计算存储
+  - in-storage computing
+  - near-data processing
+
+- name: FDP
+  case_sensitive: true
+  match_aliases_only: true
+  aliases:
+  - Flexible Data Placement
+  - NVMe FDP
+  - NVM Express FDP
+
+- name: ZNS
+  case_sensitive: true
+  aliases:
+  - Zoned Namespace
+  - Zoned Namespaces
+  - ZNS SSD
+  - zoned storage
+
+- name: Pliops
+  case_sensitive: true
+  aliases:
+  - XDP
+  - Pliops XDP
+  - LightningAI KV
+  official_domains:
+  - pliops.com
+
+- name: aiDAPTIV+
+  case_sensitive: true
+  aliases:
+  - aiDAPTIV
+  - Phison aiDAPTIV
+  - aiDAPTIVCache
+  official_domains:
+  - phison.com
+
+# ===== Neocloud / GPU 专用云（存储采购主力） =====
+- name: Neocloud
+  aliases:
+  - neocloud
+  - GPU cloud
+  - AI cloud provider
+  - CoreWeave
+  - Lambda Labs
+  - Lambda Cloud
+  - Crusoe
+  - Crusoe Cloud
+  - Nebius
+  - Together AI
+  - Fireworks AI
+  - Lepton AI
+  - Replicate
+  - RunPod
+  - Vast.ai
+  - Voltage Park
+  - Applied Digital
+
+# ===== 行业标准 / 联盟（存储 + AI 互联） =====
+- name: OCP
+  case_sensitive: true
+  match_aliases_only: true
+  aliases:
+  - Open Compute Project
+  - OCP Summit
+  - OCP Storage
+  - OCP Global Summit
+  official_domains:
+  - opencompute.org
+
+- name: SNIA
+  case_sensitive: true
+  aliases:
+  - Storage Networking Industry Association
+  - SNIA SDC
+  official_domains:
+  - snia.org
+
+- name: NVM Express
+  aliases:
+  - NVMe spec
+  - NVMe 2.0
+  - NVMe 2.1
+  - NVMe TP
+  - NVMe-MI
+  official_domains:
+  - nvmexpress.org
+
+# ===== 国产存储 / 全闪 / SSD 厂商 =====
+- name: 焱融
+  aliases:
+  - YanRong
+  - YRCloudFile
+  - 焱融科技
+  - 焱融存储
+  official_domains:
+  - yanrongyun.com
+
+- name: XSKY
+  case_sensitive: true
+  aliases:
+  - 星辰天合
+  - XSKY 星辰天合
+  - XEDP
+  - XGFS
+  official_domains:
+  - xsky.com
+
+- name: 杉岩
+  aliases:
+  - SandStone
+  - 杉岩数据
+  - SandStone USP
+  - SandStone MOS
+  official_domains:
+  - szsandstone.com
+
+- name: DapuStor
+  case_sensitive: true
+  aliases:
+  - 大普微
+  - Dapu
+  - Haishen
+  - 海神
+  official_domains:
+  - dapustor.com
+
+- name: Solidigm
+  case_sensitive: true
+  aliases:
+  - Solidigm D5
+  - Solidigm D7
+  - Solidigm SSD
+  - QLC SSD
+  official_domains:
+  - solidigm.com
+
+- name: Kioxia
+  case_sensitive: true
+  aliases:
+  - 铠侠
+  - Kioxia CM
+  - Kioxia CD
+  - Kioxia LC9
+  official_domains:
+  - kioxia.com
+
+- name: Micron
+  case_sensitive: true
+  aliases:
+  - 美光
+  - Micron 9550
+  - Micron 9650
+  - Micron HBM
+  - Micron 6500
+  official_domains:
+  - micron.com
+
+# ===========================================================================
+# AI 模型 / 推理 / 训练前沿 —— 与存储栈强耦合（每代新模型都会刷新参数量、
+# 上下文长度、KV cache 形态、checkpoint 大小、训练数据规模，直接驱动存储规划）
+# ===========================================================================
+
+# ===== 头部闭源/开源大模型（关注新版本节奏、参数/上下文/能力扩展） =====
+- name: OpenAI
+  aliases:
+  - GPT-4o
+  - GPT-4.1
+  - GPT-5
+  - o1
+  - o3
+  - o4
+  - Sora
+  - ChatGPT
+  - Codex
+  official_domains:
+  - openai.com
+  - platform.openai.com
+
+- name: Anthropic
+  aliases:
+  - Claude
+  - Claude 3.5
+  - Claude 3.7
+  - Claude 4
+  - Claude Sonnet
+  - Claude Opus
+  - Claude Haiku
+  - Claude Code
+  - MCP
+  - Model Context Protocol
+  official_domains:
+  - anthropic.com
+  - www.anthropic.com
+  - docs.anthropic.com
+
+- name: Google DeepMind
+  aliases:
+  - Gemini
+  - Gemini 2.0
+  - Gemini 2.5
+  - Gemma
+  - AlphaFold
+  - Veo
+  - Imagen
+  official_domains:
+  - deepmind.google
+  - blog.google
+  - ai.google.dev
+
+- name: Meta AI
+  aliases:
+  - Llama
+  - Llama 3
+  - Llama 4
+  - LLaMA
+  - FAIR
+  - Code Llama
+  official_domains:
+  - ai.meta.com
+  - llama.meta.com
+
+- name: Mistral
+  case_sensitive: true
+  aliases:
+  - Mistral AI
+  - Mixtral
+  - Codestral
+  - Mistral Large
+  official_domains:
+  - mistral.ai
+
+- name: xAI
+  case_sensitive: true
+  aliases:
+  - Grok
+  - Grok-3
+  - Grok-4
+  - Colossus
+  official_domains:
+  - x.ai
+
+# ===== 中国头部大模型（含其存储/算力供应链） =====
+- name: Qwen
+  case_sensitive: true
+  aliases:
+  - 通义千问
+  - Qwen2
+  - Qwen2.5
+  - Qwen3
+  - QwQ
+  - Qwen-Max
+  - Tongyi
+  official_domains:
+  - qwen.ai
+  - tongyi.aliyun.com
+
 - name: Kimi
   aliases:
-  - kimi
-  - KIMI
+  - Moonshot
+  - Moonshot AI
+  - 月之暗面
+  - Kimi K2
+  - Kimi-K1
   official_domains:
-  - www.kimi.com
-- name: NetAPP
+  - kimi.com
+  - www.moonshot.cn
+
+- name: Zhipu
   aliases:
-  - netapp
-- name: AIDP
+  - 智谱
+  - ChatGLM
+  - GLM-4
+  - GLM-4.5
+  - CodeGeeX
+  official_domains:
+  - zhipuai.cn
+  - www.zhipuai.cn
+
+- name: MiniMax
+  case_sensitive: true
   aliases:
-  - AI数据平台，AI  dataplatform
+  - MiniMax-01
+  - abab
+  - 海螺
+  official_domains:
+  - minimaxi.com
+  - www.minimax.io
+
+- name: Doubao
+  aliases:
+  - 豆包
+  - 豆包大模型
+  - Doubao-Pro
+  - Seed
+  official_domains:
+  - team.doubao.com
+
+- name: Hunyuan
+  aliases:
+  - 混元
+  - 混元大模型
+  - Hunyuan-Large
+  - Hunyuan-T1
+
+- name: ERNIE
+  case_sensitive: true
+  aliases:
+  - 文心
+  - 文心一言
+  - ERNIE 4.0
+  - ERNIE X1
+
+# ===== 训练 / 推理 / Agent 框架 =====
+- name: PyTorch
+  case_sensitive: true
+  aliases:
+  - torch.compile
+  - TorchTitan
+  - FSDP
+  - FSDP2
+  - PyTorch Distributed
+  official_domains:
+  - pytorch.org
+  - dev-discuss.pytorch.org
+
+- name: JAX
+  case_sensitive: true
+  aliases:
+  - Flax
+  - MaxText
+  - Pallas
+  official_domains:
+  - jax.readthedocs.io
+
+- name: TensorRT-LLM
+  case_sensitive: true
+  aliases:
+  - TensorRT LLM
+  - TRT-LLM
+  - TensorRT-Model-Optimizer
+  official_domains:
+  - nvidia.github.io
+
+- name: Triton
+  # 裸 "Triton" 会撞医疗影像 / 古希腊神话等无关内容，仅匹配明确的推理服务/内核短语
+  case_sensitive: true
+  match_aliases_only: true
+  aliases:
+  - Triton Inference Server
+  - TritonServer
+  - OpenAI Triton
+  - Triton kernel
+  - triton-inference-server
+
+- name: Dynamo
+  # 裸 "Dynamo" 会撞 AWS DynamoDB / 足球 / 发电机等，仅匹配 NVIDIA 推理框架
+  case_sensitive: true
+  match_aliases_only: true
+  aliases:
+  - NVIDIA Dynamo
+  - Dynamo Inference
+  - Dynamo Serve
+  - Dynamo runtime
+
+- name: DeepSpeed
+  case_sensitive: true
+  aliases:
+  - ZeRO
+  - ZeRO-Infinity
+  - DeepSpeed-Inference
+  official_domains:
+  - deepspeed.ai
+
+- name: Megatron
+  case_sensitive: true
+  aliases:
+  - Megatron-LM
+  - Megatron-Core
+  - NeMo
+  - NeMo Framework
+  official_domains:
+  - developer.nvidia.com
+
+- name: Ray
+  # 裸 "Ray" 误命中率极高（Ray-Ban / Cy Young winner Ray / 等等），
+  # match_aliases_only 让匹配器只看下方 aliases，name 仅作显示用
+  case_sensitive: true
+  match_aliases_only: true
+  aliases:
+  - Ray Serve
+  - Ray Data
+  - Ray Train
+  - Ray Tune
+  - Ray cluster
+  - Anyscale
+  - RLlib
+  official_domains:
+  - ray.io
+  - anyscale.com
+
+- name: LangChain
+  case_sensitive: true
+  aliases:
+  - LangGraph
+  - LangSmith
+  official_domains:
+  - langchain.com
+
+- name: LlamaIndex
+  case_sensitive: true
+  official_domains:
+  - llamaindex.ai
+
+# ===== 训练/推理范式与算法（影响算力 + 存储需求） =====
+- name: MoE
+  case_sensitive: true
+  aliases:
+  - Mixture of Experts
+  - 专家混合
+  - sparse MoE
+  - expert parallelism
+
+- name: RLHF
+  case_sensitive: true
+  aliases:
+  - DPO
+  - PPO
+  - GRPO
+  - reward model
+  - RLAIF
+
+- name: long context
+  aliases:
+  - 长上下文
+  - 1M context
+  - 128K context
+  - 200K context
+  - context extension
+  - YaRN
+  - RingAttention
+
+- name: agentic
+  aliases:
+  - AI agent
+  - 智能体
+  - autonomous agent
+  - agent framework
+  - tool use
+  - function calling
+  - computer use
+
+- name: multimodal
+  aliases:
+  - 多模态
+  - vision-language
+  - VLM
+  - video generation
+  - text-to-video
+  - omni model
+
+- name: world model
+  aliases:
+  - 世界模型
+  - JEPA
+  - Genie
+  - Cosmos
+
+- name: RAG
+  case_sensitive: true
+  aliases:
+  - retrieval augmented generation
+  - 检索增强生成
+  - GraphRAG
+  - LightRAG
+
+# ===== AI 芯片（影响 AI 存储栈选型） =====
+- name: AMD AI
+  aliases:
+  - MI300
+  - MI325X
+  - MI350
+  - MI400
+  - ROCm
+  - Instinct
+  official_domains:
+  - amd.com
+  - rocm.docs.amd.com
+
+- name: Intel AI
+  aliases:
+  - Gaudi 3
+  - Gaudi3
+  - Habana
+  - oneAPI
+  official_domains:
+  - intel.com
+  - habana.ai
+
+- name: TPU
+  case_sensitive: true
+  aliases:
+  - Trillium
+  - TPU v5
+  - TPU v6
+  - Ironwood
+
+- name: Trainium
+  case_sensitive: true
+  aliases:
+  - Trainium2
+  - Inferentia
+  - Neuron
+  - AWS Trainium
+
+- name: Huawei Ascend
+  aliases:
+  - 昇腾
+  - Ascend 910
+  - Ascend 910B
+  - Ascend 910C
+  - CloudMatrix
+  - MindSpore
+
+- name: Cambricon
+  aliases:
+  - 寒武纪
+  - 思元
+  - MLU
+
+- name: Cerebras
+  case_sensitive: true
+  aliases:
+  - Wafer Scale
+  - WSE-3
+  official_domains:
+  - cerebras.net
+
+- name: Groq
+  case_sensitive: true
+  aliases:
+  - GroqCloud
+  - LPU
+  official_domains:
+  - groq.com
+
+# ===== 开源模型生态平台 =====
+- name: Hugging Face
+  aliases:
+  - HuggingFace
+  - HF Hub
+  - transformers
+  - safetensors
+  official_domains:
+  - huggingface.co
+  - blog.huggingface.co
+

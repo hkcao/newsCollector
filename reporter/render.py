@@ -6,8 +6,17 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+from core.timeutil import fmt_local
+
 # 与 core.ranker.CATEGORIES 保持一致的展示顺序
-_CATEGORY_ORDER = ["公司新闻", "政策走向", "学术论文", "技术解读"]
+_CATEGORY_ORDER = [
+    "存储/基建产品",
+    "模型/框架/算法",
+    "基准评测",
+    "学术论文",
+    "政策导向",
+    "github趋势",
+]
 
 
 def _group_by_category(
@@ -19,7 +28,7 @@ def _group_by_category(
         for p in picks:
             item = dict(p)
             item["matched_kw"] = kw
-            cat = p.get("llm_category") or "技术解读"
+            cat = p.get("llm_category") or "存储/基建产品"
             bucket.setdefault(cat, []).append(item)
     # 丢掉空类别，未知类别附在最后
     out: dict[str, list[dict]] = {}
@@ -47,6 +56,7 @@ def render_html(
         loader=FileSystemLoader(str(tpl_dir)),
         autoescape=select_autoescape(["html"]),
     )
+    env.filters["localtime"] = fmt_local
     tpl = env.get_template("daily.html")
     total = sum(len(v) for v in grouped.values())
     by_category = _group_by_category(grouped)

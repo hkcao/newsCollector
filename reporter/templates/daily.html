@@ -118,10 +118,12 @@
     border-radius: 2px;
     display: inline-block;
   }
-  .cat-公司新闻 .marker { background: #0969da; }
-  .cat-政策走向 .marker { background: #cf222e; }
+  .cat-存储-基建产品 .marker { background: #0969da; }
+  .cat-模型-框架-算法 .marker { background: #6f42c1; }
+  .cat-基准评测 .marker { background: #bf8700; }
   .cat-学术论文 .marker { background: #8250df; }
-  .cat-技术解读 .marker { background: #bf8700; }
+  .cat-政策导向 .marker { background: #cf222e; }
+  .cat-github趋势 .marker { background: #1f883d; }
   .cat-header h2 {
     margin: 0;
     font-size: 18px;
@@ -244,7 +246,7 @@
   {% endif %}
 
   {% for cat, items in by_category.items() %}
-  <section id="cat-{{ loop.index }}" class="cat-section cat-{{ cat }}">
+  <section id="cat-{{ loop.index }}" class="cat-section cat-{{ cat|replace('/', '-') }}">
     <div class="cat-header">
       <span class="marker"></span>
       <h2>{{ cat }}</h2>
@@ -261,7 +263,7 @@
       <div class="item-meta">
         <span class="source">{{ p.source }}</span>
         <span class="dot">·</span>
-        <span class="time">{{ p.published[:16] }}</span>
+        <span class="time">{{ p.published | localtime }}</span>
         {% if p.matched_kw %}<span class="chip kw">#{{ p.matched_kw }}</span>{% endif %}
         {% if p.is_official %}<span class="chip official">官方</span>{% endif %}
         {% if p.summary_source == 'rss' %}<span class="chip rss">原文摘要</span>

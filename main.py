@@ -32,7 +32,16 @@ from collectors.rss import fetch_all
 from collectors.url_decoder import decode_items_inplace
 from core.db import DB
 from core.normalizer import normalize
-from core.ranker import load_llm_config, rank_all, translate_all, verify_all
+from core.timeutil import fmt_local
+from core.ranker import (
+    USAGE,
+    load_llm_config,
+    rank_all,
+    reset_usage,
+    translate_all,
+    verify_all,
+    verify_titles,
+)
 from core.secrets import load_secrets
 from core.summary import clean_rss_summary
 
@@ -85,12 +94,7 @@ def compute_since(db: DB, args) -> datetime | None:
     now = datetime.now(timezone.utc)
     if args.window_hours is not None:
         return now - timedelta(hours=args.window_hours)
-    last = db.get_meta(LAST_RUN_KEY)
-    if last:
-        try:
-            return datetime.fromisoformat(last)
-        except ValueError:
-            pass
+    # 默认固定 24h 窗口：不再以 last_run_at 收窄，避免高频运行时各分类凑不齐数据
     return now - timedelta(hours=24)
 
 
@@ -105,7 +109,7 @@ def print_no_llm(items: list[dict], top: int):
         sig_str = " ".join(f"{k}={v}" for k, v in sig.items() if v) or "-"
         print(f"\n[{i}] score={it['score']:.2f}  [{kws}]")
         print(f"    {it['title']}")
-        print(f"    {it['source']} | {it['published'][:16]} | {sig_str}")
+        print(f"    {it['source']} | {fmt_local(it['published'])} | {sig_str}")
         print(f"    {it['url']}")
 
 
@@ -133,7 +137,7 @@ def print_llm(grouped: dict[str, list[dict]]):
             if disp != it["title"]:
                 print(f"      原标题: {it['title']}")
             print(f"      📄 ({tag}) {it.get('summary','')}")
-            print(f"      {it['source']} | {it['published'][:16]}")
+            print(f"      {it['source']} | {fmt_local(it['published'])}")
             print(f"      🔗 {it['url']}")
 
 
@@ -182,7 +186,11 @@ def run_once(args) -> int:
         print(f"\n时间窗: 不限 (--all)")
     else:
         hours = (now - since).total_seconds() / 3600
-        print(f"\n时间窗: {since.isoformat()[:16]} ~ {now.isoformat()[:16]}  ({hours:.1f}h)")
+        # 内部存 UTC，显示一律转本地时区
+        print(
+            f"\n时间窗: {fmt_local(since)} ~ {fmt_local(now)} "
+            f"({hours:.1f}h, 本地时区)"
+        )
 
     print(f"\n[1/5] 抓取 {len(sources)} 个源...")
     raw = list(fetch_all(sources, keywords))
@@ -196,6 +204,7 @@ def run_once(args) -> int:
         print("\n[3/5] 跳过 LLM 排序 (--no-llm)")
         print_no_llm(items, args.top)
     else:
+        reset_usage()
         print(f"\n[3/5] LLM 按重要性筛选 (top_k 每关键词)...")
         llm_cfg = load_llm_config(ROOT / "config" / "llm.yaml")
         print(f"  模型: {llm_cfg['model']}  base_url: {llm_cfg.get('base_url') or 'OpenAI default'}")
@@ -218,6 +227,31 @@ def run_once(args) -> int:
             decode_items_inplace(picks)
         print(f"  [摘要] {rss_used} 条来自原 RSS，{llm_used} 条 LLM 生成")
 
+        # 解码后二次过滤：Google News 此时才暴露真实域名，再过一遍黑名单
+        from core.normalizer import is_blacklisted_url
+        dropped_after_decode = 0
+        for cat, picks in list(grouped_raw.items()):
+            kept = []
+            for p in picks:
+                if is_blacklisted_url(p.get("url", "")):
+                    dropped_after_decode += 1
+                else:
+                    kept.append(p)
+            grouped_raw[cat] = kept
+        if dropped_after_decode:
+            print(f"  [二次过滤] 解码后丢弃 {dropped_after_decode} 条命中黑名单域名的 picks")
+        # 去重：同一分类内若有 cross_source_count 大且标题相似的，仅保留客观分最高的
+        for cat, picks in list(grouped_raw.items()):
+            seen_titles = set()
+            kept = []
+            for p in sorted(picks, key=lambda x: -float(x.get("score", 0) or 0)):
+                key = "".join(c for c in (p.get("display_title") or p.get("title") or "")[:20].lower() if c.isalnum() or "一" <= c <= "鿿")
+                if key and key in seen_titles:
+                    continue
+                seen_titles.add(key)
+                kept.append(p)
+            grouped_raw[cat] = kept
+
         # 二次自检：仅对 LLM 生成的摘要核查推测/扩写
         if llm_used:
             verify_all(grouped_raw, llm_cfg)
@@ -226,14 +260,18 @@ def run_once(args) -> int:
         if rss_used:
             translate_all(grouped_raw, llm_cfg)
 
+        # 标题反幻觉核查：检查数字 + 主体公司名是否在原文出现过
+        print("  [标题核查] 检查所有 picks 的 display_title…")
+        verify_titles(grouped_raw, llm_cfg, keywords=keywords)
+
         grouped = flatten_to_render(grouped_raw)
 
         print("\n[4/5] 控制台输出")
         print_llm(grouped)
 
         print("\n[5/5] 生成 HTML 报告 + 推送通知")
-        win_from = since.isoformat()[:16] if since else "all"
-        win_to = now.isoformat()[:16]
+        win_from = fmt_local(since) if since else "all"
+        win_to = fmt_local(now)
         html = render_html(grouped, win_from, win_to)
         out = write_report(html, REPORTS_DIR)
         print(f"  [HTML] 已保存: {out}")
@@ -241,6 +279,8 @@ def run_once(args) -> int:
         notify_cfg = load_notify_config(ROOT / "config" / "notify.yaml")
         date_str = now.strftime("%Y-%m-%d")
         notify_all(grouped, html, date_str, notify_cfg)
+
+        print("\n" + USAGE.report())
 
     # 仅在使用动态窗口时更新 last_run_at；--window-hours / --all 不更新
     if not args.all and args.window_hours is None:

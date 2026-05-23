@@ -7,12 +7,20 @@ from __future__ import annotations
 
 import hashlib
 import os
-from datetime import datetime, timezone
+import random
+import threading
+import time
 
 import httpx
 
+from core.timeutil import parse_dt
+
 
 TAVILY_URL = "https://api.tavily.com/search"
+
+# 免费档限流严格：限制并发 + 对 429 退避重试。432（月配额耗尽）无法靠重试解决，直接放弃。
+_TAVILY_RETRIES = int(os.getenv("TAVILY_RETRIES", "3"))
+_TAVILY_SEM = threading.Semaphore(int(os.getenv("TAVILY_CONCURRENCY", "2")))
 
 
 def _make_id(url: str, title: str) -> str:
@@ -20,17 +28,10 @@ def _make_id(url: str, title: str) -> str:
 
 
 def _normalize_published(raw: str | None) -> str:
-    if not raw:
-        return datetime.now(timezone.utc).isoformat()
-    try:
-        # Tavily 返回的 published_date 一般是 "2024-05-12T08:30:00Z" 或 "2024-05-12"
-        s = raw.replace("Z", "+00:00")
-        dt = datetime.fromisoformat(s)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt.isoformat()
-    except ValueError:
-        return datetime.now(timezone.utc).isoformat()
+    """Tavily 的 published_date 形如 "2024-05-12T08:30:00Z" 或 "2024-05-12"。
+    拿不到 / 解析失败返回 ""（不伪造 now，下游按"未知"处理）。"""
+    dt = parse_dt(raw)
+    return dt.isoformat() if dt else ""
 
 
 def fetch_tavily(
@@ -54,15 +55,25 @@ def fetch_tavily(
         "include_raw_content": False,
     }
     headers = {"Authorization": f"Bearer {api_key}"}
-    try:
-        r = httpx.post(TAVILY_URL, json=payload, headers=headers, timeout=30)
-        r.raise_for_status()
-        data = r.json()
-    except httpx.HTTPStatusError as e:
-        print(f"    ! Tavily HTTP {e.response.status_code}: {e.response.text[:200]}")
-        return []
-    except Exception as e:
-        print(f"    ! Tavily 请求失败: {e}")
+    data = None
+    last = ""
+    for attempt in range(_TAVILY_RETRIES):
+        try:
+            with _TAVILY_SEM:
+                r = httpx.post(TAVILY_URL, json=payload, headers=headers, timeout=30)
+            if r.status_code == 200:
+                data = r.json()
+                break
+            # 429=限流可重试；其他（含 432 配额耗尽）放弃
+            if r.status_code != 429:
+                print(f"    ! Tavily HTTP {r.status_code}: {r.text[:160]}")
+                return []
+            last = "HTTP 429"
+        except Exception as e:
+            last = f"{e}"
+        time.sleep((2 ** attempt) * 1.0 + random.random() * 0.5)
+    if data is None:
+        print(f"    ! Tavily 重试 {_TAVILY_RETRIES} 次仍失败: {last}")
         return []
 
     items: list[dict] = []

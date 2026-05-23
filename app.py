@@ -9,6 +9,7 @@
     ⚙️ 关键词配置     —— 增删关键词、同义词、官方域名
     🌐 数据源        —— 启用/禁用 RSS 源、Tavily Search API Key
     🤖 LLM 配置       —— Base URL / 模型 / API Key
+    ✏️ Prompt 设置    —— 编辑 IMPORTANCE_RUBRIC 与各分类定义（写入 prompt_override.yaml）
     🔔 通知设置       —— 邮件 / 飞书
     📚 历史报告       —— 浏览 reports/ 目录里的旧报告
 """
@@ -40,6 +41,29 @@ CONFIG_DIR = ROOT / "config"
 REPORTS_DIR = ROOT / "reports"
 DB_PATH = ROOT / "history.sqlite"
 
+MAX_PER_CATEGORY = 5
+
+
+def cap_per_category(grouped: dict[str, list[dict]], max_per_cat: int = MAX_PER_CATEGORY) -> dict[str, list[dict]]:
+    """跨关键词，按 LLM 标记的 category 裁剪：每类最多保留 max_per_cat 条。
+    保留优先级：官方源 > 客观分数 > 关键词命中数。"""
+    ranked: list[tuple[str, dict]] = []
+    for kw, picks in grouped.items():
+        for p in picks:
+            ranked.append((kw, p))
+    ranked.sort(key=lambda x: (
+        not x[1].get("is_official", False),
+        -float(x[1].get("score", 0) or 0),
+    ))
+    counts: dict[str, int] = {}
+    kept_ids: set[int] = set()
+    for _, p in ranked:
+        cat = p.get("llm_category") or "(未分类)"
+        if counts.get(cat, 0) < max_per_cat:
+            counts[cat] = counts.get(cat, 0) + 1
+            kept_ids.add(id(p))
+    return {kw: [p for p in picks if id(p) in kept_ids] for kw, picks in grouped.items()}
+
 
 # =========================================================================
 # 配置文件读写工具
@@ -61,71 +85,120 @@ def save_yaml(path: Path, data: dict) -> None:
 # 页面: 关键词配置
 # =========================================================================
 
+def _save_keywords(keywords: list[dict]) -> None:
+    """规范化后保存到 keywords.yaml。"""
+    clean = []
+    for kw in keywords:
+        name = (kw.get("name") or "").strip()
+        if not name:
+            continue
+        entry: dict = {"name": name}
+        if kw.get("case_sensitive"):
+            entry["case_sensitive"] = True
+        if kw.get("aliases"):
+            entry["aliases"] = list(kw["aliases"])
+        if kw.get("official_domains"):
+            entry["official_domains"] = list(kw["official_domains"])
+        clean.append(entry)
+    save_yaml(CONFIG_DIR / "keywords.yaml", {"keywords": clean})
+
+
 def page_keywords():
+    from core.keyword_autocomplete import autocomplete_keyword
+    from core.ranker import load_llm_config
+
     st.header("⚙️ 关键词配置")
-    st.caption("增删关键词，配置同义词与官方域名。保存后立即生效。")
+    st.caption("输入关键词名称即可，同义词和官方域名由 LLM 自动补全。")
 
     cfg = load_yaml(CONFIG_DIR / "keywords.yaml", {"keywords": []})
-    keywords = cfg.get("keywords", [])
+    keywords: list[dict] = list(cfg.get("keywords", []))
 
-    if "kw_list" not in st.session_state:
-        st.session_state.kw_list = [dict(k) for k in keywords]
-
-    # 编辑现有关键词
-    to_delete = None
-    for idx, kw in enumerate(st.session_state.kw_list):
-        with st.expander(f"🔖  {kw.get('name', '(未命名)')}", expanded=False):
-            kw["name"] = st.text_input("名称", value=kw.get("name", ""), key=f"name_{idx}")
-            kw["case_sensitive"] = st.checkbox(
-                "大小写敏感",
-                value=kw.get("case_sensitive", False),
-                key=f"case_{idx}",
-                help="多词专有名词建议开启（如 VAST Data / vLLM）以避免撞日常短语",
-            )
-            aliases_text = st.text_input(
-                "同义词 (逗号分隔)",
-                value=", ".join(kw.get("aliases") or []),
-                key=f"alias_{idx}",
-            )
-            kw["aliases"] = [a.strip() for a in aliases_text.split(",") if a.strip()]
-
-            domains_text = st.text_area(
-                "官方域名 (每行一个)",
-                value="\n".join(kw.get("official_domains") or []),
-                key=f"dom_{idx}",
-                height=80,
-                help="全局已包含 arxiv.org / github.com，这里只填该关键词专属域名",
-            )
-            kw["official_domains"] = [d.strip() for d in domains_text.splitlines() if d.strip()]
-
-            if st.button("🗑️ 删除", key=f"del_{idx}"):
-                to_delete = idx
-
-    if to_delete is not None:
-        st.session_state.kw_list.pop(to_delete)
-        st.rerun()
+    # ---------- 添加新关键词 ----------
+    st.subheader("➕ 添加关键词")
+    new_input = st.text_area(
+        "每行一个关键词（公司 / 产品 / 技术名）",
+        placeholder="例如：\nPureStorage\n阿里\n腾讯\n字节跳动\n百度",
+        height=110,
+        key="new_kw_input",
+    )
+    auto_complete = st.checkbox("通过 LLM 自动补全同义词 + 官方域名", value=True)
+    if st.button("✚ 添加", type="primary"):
+        names = [n.strip() for n in new_input.splitlines() if n.strip()]
+        existing = {kw.get("name", "").lower() for kw in keywords}
+        llm_cfg = None
+        if auto_complete:
+            try:
+                llm_cfg = load_llm_config(CONFIG_DIR / "llm.yaml")
+            except Exception as e:
+                st.warning(f"LLM 未就绪：{e} —— 将以裸名称保存，不做补全")
+                llm_cfg = None
+        added, skipped = 0, []
+        for name in names:
+            if name.lower() in existing:
+                skipped.append(name)
+                continue
+            if llm_cfg:
+                with st.spinner(f"LLM 补全「{name}」…"):
+                    try:
+                        entry = autocomplete_keyword(name, llm_cfg)
+                    except Exception as e:
+                        st.error(f"「{name}」补全失败：{e}")
+                        entry = {"name": name}
+            else:
+                entry = {"name": name}
+            keywords.append(entry)
+            existing.add(name.lower())
+            added += 1
+        if added:
+            _save_keywords(keywords)
+            msg = f"已添加 {added} 个关键词"
+            if skipped:
+                msg += f"，跳过已存在：{', '.join(skipped)}"
+            st.success(msg)
+            st.rerun()
+        elif skipped:
+            st.info(f"全部已存在：{', '.join(skipped)}")
 
     st.divider()
-    if st.button("➕ 添加关键词"):
-        st.session_state.kw_list.append({"name": "新关键词", "aliases": [], "official_domains": []})
-        st.rerun()
 
-    if st.button("💾 保存所有更改", type="primary"):
-        clean = []
-        for kw in st.session_state.kw_list:
-            if not kw.get("name", "").strip():
-                continue
-            entry = {"name": kw["name"].strip()}
+    # ---------- 现有关键词列表 ----------
+    st.subheader(f"📋 当前 {len(keywords)} 个关键词")
+    if not keywords:
+        st.info("还没有关键词，先在上面添加。")
+        return
+
+    for idx, kw in enumerate(keywords):
+        name = kw.get("name", "(未命名)")
+        n_alias = len(kw.get("aliases") or [])
+        n_dom = len(kw.get("official_domains") or [])
+        with st.expander(
+            f"**{name}**  ·  同义词 {n_alias}  ·  官方域名 {n_dom}",
+            expanded=False,
+        ):
+            st.caption("**同义词**")
+            st.write(", ".join(kw.get("aliases") or []) or "_(无)_")
+            st.caption("**官方域名**")
+            st.write(", ".join(kw.get("official_domains") or []) or "_(无)_")
             if kw.get("case_sensitive"):
-                entry["case_sensitive"] = True
-            if kw.get("aliases"):
-                entry["aliases"] = kw["aliases"]
-            if kw.get("official_domains"):
-                entry["official_domains"] = kw["official_domains"]
-            clean.append(entry)
-        save_yaml(CONFIG_DIR / "keywords.yaml", {"keywords": clean})
-        st.success(f"已保存 {len(clean)} 个关键词到 config/keywords.yaml")
-        del st.session_state["kw_list"]
+                st.caption("⚠️ 大小写敏感")
+
+            col_a, col_b, col_c = st.columns([1, 1, 4])
+            if col_a.button("🔄 重新补全", key=f"refresh_{idx}",
+                            help="通过 LLM 重新生成同义词和官方域名（覆盖现有）"):
+                try:
+                    llm_cfg = load_llm_config(CONFIG_DIR / "llm.yaml")
+                    with st.spinner(f"重新补全「{name}」…"):
+                        new_entry = autocomplete_keyword(name, llm_cfg)
+                    keywords[idx] = new_entry
+                    _save_keywords(keywords)
+                    st.success("已更新")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"补全失败：{e}")
+            if col_b.button("🗑️ 删除", key=f"del_{idx}"):
+                keywords.pop(idx)
+                _save_keywords(keywords)
+                st.rerun()
 
 
 # =========================================================================
@@ -343,23 +416,25 @@ def page_llm():
     col1, col2 = st.columns(2)
     with col1:
         top_k = st.number_input(
-            "每关键词最多输出条数 (top_k)",
+            "每个分类最多输出条数 (top_k_per_category)",
             min_value=1, max_value=10,
-            value=int(cfg.get("top_k_per_keyword", 2)),
+            value=int(cfg.get("top_k_per_category", cfg.get("top_k_per_keyword", 5))),
+            help="排序单元已从「关键词」改为「分类」，每个分类独立挑 top_k 条",
         )
     with col2:
         max_cand = st.number_input(
-            "送 LLM 的候选池上限",
+            "送 LLM 的候选池上限（每分类）",
             min_value=10, max_value=100,
-            value=int(cfg.get("max_candidates_per_keyword", 40)),
+            value=int(cfg.get("max_candidates_per_category",
+                              cfg.get("max_candidates_per_keyword", 40))),
         )
 
     if st.button("💾 保存 LLM 配置", type="primary"):
         new_cfg = {
             "base_url": base_url.strip(),
             "model": model.strip(),
-            "top_k_per_keyword": int(top_k),
-            "max_candidates_per_keyword": int(max_cand),
+            "top_k_per_category": int(top_k),
+            "max_candidates_per_category": int(max_cand),
         }
         if api_key.strip():
             new_cfg["api_key"] = api_key.strip()
@@ -379,9 +454,10 @@ def page_llm():
 
 def page_notify():
     st.header("🔔 通知设置")
-    cfg = load_yaml(CONFIG_DIR / "notify.yaml", {"email": {}, "feishu": {}})
+    cfg = load_yaml(CONFIG_DIR / "notify.yaml", {"email": {}, "feishu": {}, "wecom": {}})
     email_cfg = cfg.get("email") or {}
     feishu_cfg = cfg.get("feishu") or {}
+    wecom_cfg = cfg.get("wecom") or {}
 
     with st.expander("📧 邮件 (SMTP)", expanded=True):
         em_enabled = st.checkbox("启用邮件推送", value=email_cfg.get("enabled", False))
@@ -410,7 +486,34 @@ def page_notify():
             "Webhook URL",
             value=os.getenv("FEISHU_WEBHOOK", ""),
             type="password",
-            help="群机器人自定义 webhook，也可通过环境变量 FEISHU_WEBHOOK 提供",
+            help="群机器人自定义 webhook。保存后写入 config/secrets.yaml（已 gitignore）",
+        )
+
+    with st.expander("💼 企业微信群机器人", expanded=True):
+        wc_enabled = st.checkbox(
+            "启用企业微信推送",
+            value=wecom_cfg.get("enabled", False),
+            key="wc_enabled",
+        )
+        wc_mode = st.radio(
+            "消息格式",
+            ["markdown", "text"],
+            index=0 if wecom_cfg.get("mode", "markdown") == "markdown" else 1,
+            horizontal=True,
+            help="markdown 支持加粗 / 可点击链接（推荐），text 是纯文本兜底",
+        )
+        wc_max = st.number_input(
+            "最大消息块数",
+            min_value=1, max_value=20,
+            value=int(wecom_cfg.get("max_chunks", 6)),
+            help="单条 markdown 上限 4096 字节，超出会自动分块。机器人 1 分钟限 20 条",
+        )
+        wc_webhook = st.text_input(
+            "Webhook URL",
+            value=os.getenv("WECOM_WEBHOOK", ""),
+            type="password",
+            help="获取：企业微信群 → 群设置 → 群机器人 → 添加 → 自定义机器人 → 复制 URL。"
+                 "保存后写入 config/secrets.yaml（已 gitignore），守护进程也能读到。",
         )
 
     if st.button("💾 保存通知配置", type="primary"):
@@ -426,15 +529,21 @@ def page_notify():
                 "subject_prefix": em_subj,
             },
             "feishu": {"enabled": fs_enabled, "mode": fs_mode},
+            "wecom": {
+                "enabled": wc_enabled,
+                "mode": wc_mode,
+                "max_chunks": int(wc_max),
+            },
         }
         save_yaml(CONFIG_DIR / "notify.yaml", new_cfg)
-        # 密码 / webhook 写到本地 secrets 文件，避免污染主配置
+        # 凭据持久化到 secrets.yaml（已 gitignore），守护进程 / cron 也能读到
         if em_pwd:
-            os.environ["EMAIL_PASSWORD"] = em_pwd
+            save_secret("EMAIL_PASSWORD", em_pwd)
         if fs_webhook:
-            os.environ["FEISHU_WEBHOOK"] = fs_webhook
-        st.success("通知配置已保存。密码/webhook 仅注入当前进程环境变量；"
-                   "如需持久化，请在系统层 export。")
+            save_secret("FEISHU_WEBHOOK", fs_webhook)
+        if wc_webhook:
+            save_secret("WECOM_WEBHOOK", wc_webhook)
+        st.success("通知配置已保存到 config/notify.yaml；凭据写入 config/secrets.yaml")
 
 
 # =========================================================================
@@ -480,15 +589,23 @@ def render_grouped(grouped: dict[str, list[dict]]):
             st.divider()
 
 
+from core.ranker import CATEGORIES  # noqa: E402
+
+
 def render_by_category(grouped: dict[str, list[dict]]):
-    """跨关键词，按 LLM 标记的类别聚合呈现。"""
-    from core.ranker import CATEGORIES
+    """跨关键词，按 LLM 标记的类别聚合呈现。每个分类内按 (官方源, 客观分数) 排序。"""
     bucket: dict[str, list[tuple[str, dict]]] = {c: [] for c in CATEGORIES}
     bucket["(未分类)"] = []
     for kw, picks in grouped.items():
         for p in picks:
             c = p.get("llm_category") or "(未分类)"
             bucket.setdefault(c, []).append((kw, p))
+    # 分类内排序：官方源在前，再按客观 score 降序
+    for c in bucket:
+        bucket[c].sort(key=lambda x: (
+            not x[1].get("is_official", False),
+            -float(x[1].get("score", 0) or 0),
+        ))
     total = sum(len(v) for v in bucket.values())
     if total == 0:
         st.info("还没有结果。")
@@ -502,7 +619,10 @@ def render_by_category(grouped: dict[str, list[dict]]):
             badges = []
             if p.get("is_official"):
                 badges.append("`官方`")
-            badges.append(f"`{kw}`")
+            # 显示关键词命中（matched_keywords）而非分组键（分组键已是分类名）
+            mks = p.get("matched_keywords") or ([kw] if kw and kw not in CATEGORIES else [])
+            for mk in mks[:3]:
+                badges.append(f"`{mk}`")
             src = p.get("summary_source", "")
             if src == "rss":
                 badges.append("`原文摘要`")
@@ -558,7 +678,7 @@ def page_run():
         with col2:
             window_mode = st.selectbox(
                 "时间窗",
-                ["自动 (距上次运行)", "强制 24h", "强制 6h", "不限"],
+                ["24 小时", "一周"],
             )
 
         # 个性化偏好（辅助 LLM 重排，可空）
@@ -614,13 +734,9 @@ def page_run():
                 return
 
         # 解析时间窗
-        window_hours, use_all = None, False
-        if window_mode == "强制 24h":
-            window_hours = 24
-        elif window_mode == "强制 6h":
-            window_hours = 6
-        elif window_mode == "不限":
-            use_all = True
+        window_hours, use_all = 24, False
+        if window_mode == "一周":
+            window_hours = 24 * 7
 
         log_lines: list[str] = []
         log_box = st.empty()
@@ -648,6 +764,14 @@ def page_run():
                 status.update(label=f"失败: {e}", state="error")
                 st.exception(e)
                 return
+
+        # 全局按类别裁剪：每个分类最多 MAX_PER_CATEGORY 条
+        if result.get("grouped"):
+            before = sum(len(v) for v in result["grouped"].values())
+            result["grouped"] = cap_per_category(result["grouped"])
+            after = sum(len(v) for v in result["grouped"].values())
+            if before != after:
+                log(f"[CAP] 按类别裁剪：{before} → {after}（每类 ≤ {MAX_PER_CATEGORY}）")
 
         st.session_state["last_result"] = result
 
@@ -688,23 +812,125 @@ def page_run():
 
         from main import flatten_to_render
         flat = flatten_to_render(result["grouped"])
-
-        # 视图切换：按关键词 / 按类别
-        view_mode = st.radio(
-            "结果视图",
-            ["按类别汇总（跨关键词）", "按关键词分组"],
-            horizontal=True,
-            key="view_mode",
-        )
-        if view_mode == "按关键词分组":
-            render_grouped(flat)
-        else:
-            render_by_category(flat)
+        render_by_category(flat)
 
 
 # =========================================================================
 # 页面: 历史报告
 # =========================================================================
+
+# =========================================================================
+# 页面: Prompt 设置（rubric + 各分类定义的可视化编辑 + override 持久化）
+# =========================================================================
+
+def page_prompt():
+    from core.ranker import (
+        DEFAULT_IMPORTANCE_RUBRIC, DEFAULT_CATEGORY_DEFS,
+        get_importance_rubric, get_category_defs,
+        save_prompt_overrides, reset_prompt_overrides,
+        PROMPT_OVERRIDE_PATH, CATEGORIES,
+    )
+
+    st.header("⚙️ Prompt 设置")
+    st.caption(
+        "LLM 排序时使用的「重要性评判 rubric」+「各分类定义」。修改后写入 "
+        "`config/prompt_override.yaml`（已 gitignore），下次抓取自动加载；"
+        "**留空 / 恢复默认**则回退到代码内置版。"
+    )
+
+    has_override = PROMPT_OVERRIDE_PATH.exists()
+    if has_override:
+        try:
+            meta = yaml.safe_load(PROMPT_OVERRIDE_PATH.read_text(encoding="utf-8")) or {}
+            updated = meta.get("updated_at", "未知")
+            st.success(f"✅ 当前已启用 override（版本 {meta.get('version','?')}，更新于 {updated}）")
+        except Exception:
+            st.warning("⚠️ override 文件存在但解析失败，运行时将回退默认")
+    else:
+        st.info("当前使用代码内置默认 prompt（未启用 override）")
+
+    cur_rubric = get_importance_rubric()
+    cur_defs = get_category_defs()
+
+    # ---- 编辑区 ----
+    st.subheader("1. 重要性评判 Rubric（IMPORTANCE_RUBRIC）")
+    st.caption("LLM 在筛选时遵守的多维评分标准；候选条目都会附在此 rubric 后面送给 LLM。")
+    new_rubric = st.text_area(
+        "rubric 文本",
+        value=cur_rubric,
+        height=600,
+        key="prompt_rubric_text",
+        label_visibility="collapsed",
+    )
+    rubric_changed = new_rubric.strip() != DEFAULT_IMPORTANCE_RUBRIC.strip()
+    st.caption(
+        ("🟡 已偏离默认" if rubric_changed else "🟢 与默认一致")
+        + f"  ·  字符数: {len(new_rubric)}"
+    )
+
+    st.subheader("2. 各分类定义（CATEGORY_DEFS）")
+    st.caption("每个分类发给 LLM 的「本分类定义」段落，告诉 LLM 这桶里应该收什么。")
+    new_defs: dict[str, str] = {}
+    for cat in CATEGORIES:
+        cur_text = cur_defs.get(cat, DEFAULT_CATEGORY_DEFS.get(cat, ""))
+        default_text = DEFAULT_CATEGORY_DEFS.get(cat, "")
+        diverged = cur_text.strip() != default_text.strip()
+        with st.expander(
+            f"{'🟡' if diverged else '🟢'} {cat}",
+            expanded=False,
+        ):
+            txt = st.text_area(
+                f"{cat} 定义",
+                value=cur_text,
+                height=180,
+                key=f"prompt_catdef_{cat}",
+                label_visibility="collapsed",
+            )
+            new_defs[cat] = txt
+
+    st.divider()
+
+    # ---- 操作按钮 ----
+    col1, col2, col3 = st.columns([1, 1, 2])
+
+    with col1:
+        if st.button("💾 保存修改", type="primary", use_container_width=True):
+            # 若内容与默认完全一致，不写文件（避免无意义的 override）
+            rubric_to_save = (
+                new_rubric.strip()
+                if new_rubric.strip() and new_rubric.strip() != DEFAULT_IMPORTANCE_RUBRIC.strip()
+                else None
+            )
+            defs_to_save = {
+                k: v for k, v in new_defs.items()
+                if v.strip() and v.strip() != DEFAULT_CATEGORY_DEFS.get(k, "").strip()
+            }
+            if rubric_to_save is None and not defs_to_save:
+                # 所有项都跟默认一样 —— 等价于恢复默认
+                reset_prompt_overrides()
+                st.success("所有内容已与默认一致，已删除 override 文件。")
+            else:
+                save_prompt_overrides(rubric_to_save, defs_to_save or None)
+                st.success(f"已保存到 `{PROMPT_OVERRIDE_PATH.relative_to(ROOT)}`")
+            st.rerun()
+
+    with col2:
+        if st.button("↩️ 恢复默认", use_container_width=True, disabled=not has_override):
+            removed = reset_prompt_overrides()
+            if removed:
+                st.success("已删除 override，回到代码内置默认。")
+            else:
+                st.info("当前无 override 文件，无需恢复。")
+            st.rerun()
+
+    with col3:
+        if has_override:
+            with st.expander("查看原始 override.yaml"):
+                st.code(
+                    PROMPT_OVERRIDE_PATH.read_text(encoding="utf-8"),
+                    language="yaml",
+                )
+
 
 def page_history():
     st.header("📚 历史报告")
@@ -730,28 +956,196 @@ def page_history():
 
 st.set_page_config(page_title="newsCollector", page_icon="📰", layout="wide")
 
-# 全局字号统一：让 markdown 普通文本、caption、链接、bold 都接近 base font-size，
-# 避免 Streamlit 默认主题里 ###/####/metric 和正文跨度过大引起的"突然变大"
+# Tavily 风格：亮色底 + 大留白 + 卡片 + 圆角 + 蓝紫色高亮
 st.markdown("""
 <style>
-/* 正文段落与列表 */
-section.main p, section.main li, section.main span, section.main div[data-testid="stMarkdownContainer"] {
-    font-size: 0.95rem; line-height: 1.65;
+:root {
+    --nc-bg: #fafafa;
+    --nc-card: #ffffff;
+    --nc-border: #e8eaed;
+    --nc-border-strong: #d4d7dc;
+    --nc-text: #1a1a1a;
+    --nc-text-soft: #4a5160;
+    --nc-muted: #8a8f99;
+    --nc-accent: #468bff;
+    --nc-accent-hover: #2563eb;
+    --nc-accent-soft: #eef4ff;
+    --nc-chip-bg: #f3f5f9;
+    --nc-chip-text: #4a5160;
+    --nc-radius: 12px;
+    --nc-radius-sm: 8px;
+    --nc-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
+    --nc-shadow-hover: 0 4px 12px rgba(15, 23, 42, 0.08);
+    --nc-font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+               "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    --nc-mono: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
 }
-/* 标题层级压紧 */
-section.main h1 { font-size: 1.6rem; }
-section.main h2 { font-size: 1.3rem; }
-section.main h3 { font-size: 1.1rem; }
-section.main h4 { font-size: 1.0rem; }
-/* caption 略小 */
-section.main small, section.main .stCaption, section.main [data-testid="stCaptionContainer"] {
-    font-size: 0.82rem; color: #666;
+
+/* 全局：白底、Inter 字体、放松行距 */
+html, body, [class*="css"], .stApp {
+    font-family: var(--nc-font);
+    -webkit-font-smoothing: antialiased;
+    letter-spacing: -0.005em;
 }
-/* metric 数字别过大 */
-[data-testid="stMetricValue"] { font-size: 1.2rem; }
-[data-testid="stMetricLabel"] { font-size: 0.8rem; }
-/* divider 间距收紧 */
-hr { margin: 8px 0; }
+.stApp { background: var(--nc-bg); }
+section.main { padding: 1.5rem 2rem; }
+section.main .block-container { max-width: 1080px; padding-top: 1rem; }
+
+/* 正文 */
+section.main p, section.main li, section.main span,
+section.main div[data-testid="stMarkdownContainer"] {
+    font-size: 0.94rem; line-height: 1.7; color: var(--nc-text-soft);
+}
+section.main strong { color: var(--nc-text); font-weight: 600; }
+
+/* 标题：清爽、字重克制 */
+section.main h1, section.main h2, section.main h3, section.main h4 {
+    color: var(--nc-text); font-weight: 600; letter-spacing: -0.015em;
+}
+section.main h1 { font-size: 1.7rem; margin: 0 0 .35rem; }
+section.main h2 { font-size: 1.25rem; margin: 1.2rem 0 .5rem; }
+section.main h3 { font-size: 1.05rem; }
+section.main h4 { font-size: 0.97rem; }
+
+/* caption */
+section.main small, section.main .stCaption,
+section.main [data-testid="stCaptionContainer"] {
+    font-size: 0.82rem; color: var(--nc-muted); letter-spacing: 0;
+}
+
+/* metric：卡片化，蓝色数字 */
+[data-testid="stMetric"] {
+    background: var(--nc-card);
+    border: 1px solid var(--nc-border);
+    border-radius: var(--nc-radius);
+    padding: 14px 18px;
+    box-shadow: var(--nc-shadow);
+    transition: box-shadow .15s ease, transform .15s ease;
+}
+[data-testid="stMetric"]:hover {
+    box-shadow: var(--nc-shadow-hover);
+}
+[data-testid="stMetricValue"] {
+    font-size: 1.55rem; font-weight: 600; color: var(--nc-accent);
+    letter-spacing: -0.02em;
+}
+[data-testid="stMetricLabel"] {
+    font-size: 0.78rem; color: var(--nc-muted);
+    text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500;
+}
+
+/* badge：浅灰胶囊 */
+section.main code {
+    font-family: var(--nc-font); font-size: 0.74rem; font-weight: 500;
+    background: var(--nc-chip-bg); color: var(--nc-chip-text);
+    border-radius: 999px; padding: 2px 9px; margin: 0 3px;
+    border: 1px solid transparent;
+    letter-spacing: 0.01em;
+}
+
+/* 链接：底蓝下划线 hover */
+section.main a {
+    color: var(--nc-accent); text-decoration: none; font-weight: 500;
+    border-bottom: 1px solid transparent;
+    transition: border-color .15s ease, color .15s ease;
+}
+section.main a:hover { color: var(--nc-accent-hover); border-bottom-color: var(--nc-accent-hover); }
+
+/* expander 卡片化 */
+[data-testid="stExpander"] {
+    background: var(--nc-card);
+    border: 1px solid var(--nc-border) !important;
+    border-radius: var(--nc-radius) !important;
+    box-shadow: var(--nc-shadow);
+    overflow: hidden;
+    margin-bottom: .55rem;
+}
+[data-testid="stExpander"] summary {
+    padding: .75rem 1rem; font-weight: 500; color: var(--nc-text);
+}
+[data-testid="stExpander"] summary:hover { background: var(--nc-accent-soft); }
+
+/* button：圆角 + 蓝色主按钮 */
+.stButton > button, .stDownloadButton > button, .stFormSubmitButton > button {
+    border-radius: var(--nc-radius-sm) !important;
+    border: 1px solid var(--nc-border-strong);
+    background: var(--nc-card); color: var(--nc-text);
+    font-weight: 500; padding: .45rem 1.1rem;
+    transition: all .15s ease; box-shadow: var(--nc-shadow);
+}
+.stButton > button:hover, .stDownloadButton > button:hover, .stFormSubmitButton > button:hover {
+    border-color: var(--nc-accent); color: var(--nc-accent);
+    box-shadow: var(--nc-shadow-hover);
+}
+.stButton > button[kind="primary"], .stFormSubmitButton > button[kind="primary"] {
+    background: var(--nc-accent); border-color: var(--nc-accent); color: #fff;
+}
+.stButton > button[kind="primary"]:hover, .stFormSubmitButton > button[kind="primary"]:hover {
+    background: var(--nc-accent-hover); border-color: var(--nc-accent-hover); color: #fff;
+}
+
+/* input / textarea / select */
+.stTextInput input, .stTextArea textarea, .stNumberInput input {
+    border-radius: var(--nc-radius-sm) !important;
+    border: 1px solid var(--nc-border-strong) !important;
+    background: var(--nc-card) !important;
+    font-family: var(--nc-font) !important;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+.stTextInput input:focus, .stTextArea textarea:focus, .stNumberInput input:focus {
+    border-color: var(--nc-accent) !important;
+    box-shadow: 0 0 0 3px rgba(70, 139, 255, 0.15) !important;
+}
+.stSelectbox div[data-baseweb="select"] > div {
+    border-radius: var(--nc-radius-sm) !important;
+    border-color: var(--nc-border-strong) !important;
+    background: var(--nc-card) !important;
+}
+
+/* form 容器 */
+[data-testid="stForm"] {
+    background: var(--nc-card);
+    border: 1px solid var(--nc-border);
+    border-radius: var(--nc-radius);
+    padding: 1.25rem 1.4rem;
+    box-shadow: var(--nc-shadow);
+}
+
+/* sidebar：浅灰底 */
+[data-testid="stSidebar"] {
+    background: #f7f8fa;
+    border-right: 1px solid var(--nc-border);
+}
+[data-testid="stSidebar"] h1 {
+    font-size: 1.15rem; font-weight: 600; color: var(--nc-text);
+    letter-spacing: -0.01em;
+}
+[data-testid="stSidebar"] [data-baseweb="radio"] label {
+    padding: .45rem .6rem; border-radius: var(--nc-radius-sm);
+    transition: background .15s ease;
+}
+[data-testid="stSidebar"] [data-baseweb="radio"] label:hover {
+    background: var(--nc-accent-soft);
+}
+
+/* status widget */
+[data-testid="stStatusWidget"] {
+    border-radius: var(--nc-radius); border: 1px solid var(--nc-border);
+    background: var(--nc-card); box-shadow: var(--nc-shadow);
+}
+
+/* divider */
+hr { margin: 1rem 0; border-color: var(--nc-border); }
+
+/* radio 横排 */
+[data-baseweb="radio"] > div { gap: .25rem; }
+
+/* code block（运行日志） */
+section.main pre {
+    background: #0f172a; color: #e2e8f0; border-radius: var(--nc-radius-sm);
+    font-family: var(--nc-mono); font-size: 0.82rem;
+    padding: .9rem 1rem; border: 1px solid #1e293b;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -762,6 +1156,7 @@ PAGES = {
     "⚙️ 关键词配置": page_keywords,
     "🌐 数据源": page_sources,
     "🤖 LLM 配置": page_llm,
+    "✏️ Prompt 设置": page_prompt,
     "🔔 通知设置": page_notify,
     "📚 历史报告": page_history,
 }

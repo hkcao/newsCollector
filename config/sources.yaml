@@ -8,16 +8,17 @@ sources:
     type: rss
     url: https://hnrss.org/frontpage?points=100
     category: tech
+    enabled: false   # [2026-05-23] 论坛/UGC 非新闻，移出搜索空间（同时弃用 HN points/comments 排序信号）
 
-  - name: Reddit r/MachineLearning
-    type: rss
-    url: https://www.reddit.com/r/MachineLearning/.rss
-    category: ml
-
-  - name: Reddit r/LocalLLaMA
-    type: rss
-    url: https://www.reddit.com/r/LocalLLaMA/.rss
-    category: ml
+  # [2026-05-18] 已注释：Reddit 源信息量低，用户不需要
+  # - name: Reddit r/MachineLearning
+  #   type: rss
+  #   url: https://www.reddit.com/r/MachineLearning/.rss
+  #   category: ml
+  # - name: Reddit r/LocalLLaMA
+  #   type: rss
+  #   url: https://www.reddit.com/r/LocalLLaMA/.rss
+  #   category: ml
 
   - name: arXiv cs.AI
     type: rss
@@ -53,6 +54,309 @@ sources:
 
   # 注：DeepSeek 官方暂未暴露 RSS，靠 Tavily / Google News + official_domains 兜底
 
+  # ===== AI 存储 / 基础设施 行业垂直媒体 =====
+  # 这些是 AI 存储分析师每日必读的英文行业站，覆盖厂商动态、新品评测、市场份额
+  - name: Blocks & Files
+    type: rss
+    url: https://blocksandfiles.com/feed/
+    category: storage
+
+  - name: The Register - Storage
+    type: rss
+    url: https://www.theregister.com/on_prem/storage/headlines.atom
+    category: storage
+
+  - name: The Register - AI/ML
+    type: rss
+    url: https://www.theregister.com/software/ai_ml/headlines.atom
+    category: ai-infra
+
+  - name: The Next Platform
+    type: rss
+    url: https://www.nextplatform.com/feed/
+    category: ai-infra
+
+  - name: StorageReview
+    type: rss
+    url: https://www.storagereview.com/feed
+    category: storage
+
+  - name: SemiAnalysis
+    type: rss
+    url: https://www.semianalysis.com/feed
+    category: ai-infra
+
+  # ===== AI 存储 / 基建厂商官方博客（一手来源，优先级最高） =====
+  - name: VAST Data Blog
+    type: rss
+    url: https://www.vastdata.com/rss/blog.xml
+    category: official
+
+  - name: WEKA Blog
+    type: rss
+    url: https://www.weka.io/feed/
+    category: official
+
+  - name: DDN Blog
+    type: rss
+    url: https://www.ddn.com/blog/feed/
+    category: official
+    enabled: false   # [2026-05-23] /blog/feed 返回 HTML 非 RSS，无可用 feed，由 Google News(DDN) 兜底
+
+  - name: Pure Storage Blog
+    type: rss
+    url: https://blog.purestorage.com/feed/
+    category: official
+
+  - name: NetApp Blog
+    type: rss
+    url: https://www.netapp.com/blog/rss/
+    category: official
+    enabled: false   # [2026-05-23] HTTP 403 反爬封禁（datacenter IP），由 Google News(NetApp) 兜底
+
+  - name: Hammerspace Blog
+    type: rss
+    url: https://hammerspace.com/feed/
+    category: official
+    enabled: false   # [2026-05-23] HTTP 410 Gone，feed 永久下线，由 Google News(Hammerspace) 兜底
+
+  - name: MinIO Blog
+    type: rss
+    url: https://blog.min.io/rss/
+    category: official
+    enabled: false   # [2026-05-23] blog.min.io 迁移 min.io/blog 后无 .xml feed，由 Google News(MinIO) 兜底
+
+  - name: Ceph Blog
+    type: rss
+    url: https://ceph.io/en/news/blog/index.xml
+    category: official
+    enabled: false   # [2026-05-23] 博客无 feed（GH issue ceph/ceph.io#658 求 RSS 未实现）
+
+  # === 补充：存储/AI 基建厂商一手博客 ===
+  - name: IBM Storage Blog
+    type: rss
+    url: https://www.ibm.com/blogs/systems/feed/
+    category: official
+    enabled: false   # [2026-05-23] IBM 已下线 systems 博客，feed 返回空，由 Google News 兜底
+
+  - name: Dell Tech Infohub
+    type: rss
+    url: https://infohub.delltechnologies.com/rss/
+    category: official
+
+  - name: HPE Tech Blog
+    type: rss
+    url: https://community.hpe.com/havfh54317/rss/board?board.id=AI-Insights
+    category: official
+
+  - name: Cerebras Blog
+    type: rss
+    url: https://www.cerebras.net/feed/
+    category: official
+    enabled: false   # [2026-05-23] cerebras.ai 改版后无 RSS，由 Google News(Cerebras) 兜底
+
+  - name: Groq Blog
+    type: rss
+    url: https://groq.com/feed/
+    category: official
+    enabled: false   # [2026-05-23] groq.com/feed 返回 HTML 非 RSS，无可用 feed，由 Google News(Groq) 兜底
+
+  - name: Solidigm Blog
+    type: rss
+    url: https://www.solidigm.com/about-us/newsroom.rss
+    category: official
+    enabled: false   # [2026-05-23] 新闻室无 RSS（多路径 404），由 Google News(Solidigm) 兜底
+
+  - name: SambaNova Blog
+    type: rss
+    url: https://sambanova.ai/blog/rss.xml
+    category: official
+
+  # ===== AI 模型 / 推理 厂商官方博客 =====
+  - name: OpenAI Blog
+    type: rss
+    url: https://openai.com/blog/rss.xml
+    category: official
+
+  - name: Anthropic News
+    type: rss
+    url: https://www.anthropic.com/news/rss.xml
+    category: official
+    enabled: false   # [2026-05-23] 官方已无 RSS（全路径 404），由 Google News(Anthropic) 兜底
+
+  - name: Google DeepMind Blog
+    type: rss
+    url: https://deepmind.google/blog/rss.xml
+    category: official
+
+  - name: Meta AI Blog
+    type: rss
+    url: https://ai.meta.com/blog/rss/
+    category: official
+    enabled: false   # [2026-05-23] ai.meta.com 返回 400 无 feed（about.fb.com 全公司源过宽不采用）
+
+  - name: Hugging Face Blog
+    type: rss
+    url: https://huggingface.co/blog/feed.xml
+    category: official
+
+  - name: PyTorch Blog
+    type: rss
+    url: https://pytorch.org/blog/feed/
+    category: official
+
+  - name: AWS Storage Blog
+    type: rss
+    url: https://aws.amazon.com/blogs/storage/feed/
+    category: official
+
+  - name: AWS Machine Learning Blog
+    type: rss
+    url: https://aws.amazon.com/blogs/machine-learning/feed/
+    category: official
+
+  - name: Google Cloud Blog
+    type: rss
+    url: https://cloudblog.withgoogle.com/rss/
+    category: official
+
+  # === 大厂研究博客（系统/存储论文落地窗口） ===
+  - name: Google Research Blog
+    type: rss
+    url: https://research.google/blog/rss/
+    category: official
+
+  - name: Microsoft Research Blog
+    type: rss
+    url: https://www.microsoft.com/en-us/research/feed/
+    category: official
+
+  - name: Meta Engineering Blog
+    type: rss
+    url: https://engineering.fb.com/feed/
+    category: official
+
+  - name: NVIDIA Research Blog
+    type: rss
+    url: https://research.nvidia.com/rss.xml
+    category: official
+
+  # === 论文精选（信噪比 > 裸 arXiv） ===
+  - name: Hugging Face Daily Papers
+    type: rss
+    url: https://jamesg.blog/hf-papers.xml
+    category: paper
+
+  # ===== arXiv 存储/系统相关 =====
+  - name: arXiv cs.DC (分布式 / 并行 / 集群计算)
+    type: rss
+    url: http://export.arxiv.org/rss/cs.DC
+    category: paper
+
+  - name: arXiv cs.OS (操作系统 / 存储)
+    type: rss
+    url: http://export.arxiv.org/rss/cs.OS
+    category: paper
+
+  - name: arXiv cs.AR (硬件架构)
+    type: rss
+    url: http://export.arxiv.org/rss/cs.AR
+    category: paper
+
+  - name: arXiv cs.PF (性能)
+    type: rss
+    url: http://export.arxiv.org/rss/cs.PF
+    category: paper
+
+  - name: arXiv cs.DB (数据库 / 数据系统)
+    type: rss
+    url: http://export.arxiv.org/rss/cs.DB
+    category: paper
+
+  # ===== GitHub Trending =====
+  # GitHub 官方未提供 trending API/RSS，社区项目 mshibanami/GitHubTrendingRSS
+  # 把 github.com/trending 转成 RSS，含 daily/weekly/monthly + 各语言变体
+  - name: GitHub Trending (Daily)
+    type: rss
+    url: https://mshibanami.github.io/GitHubTrendingRSS/daily/all.xml
+    category: tech
+
+  - name: GitHub Trending (Weekly)
+    type: rss
+    url: https://mshibanami.github.io/GitHubTrendingRSS/weekly/all.xml
+    category: tech
+
+  - name: GitHub Trending Python (Daily)
+    type: rss
+    url: https://mshibanami.github.io/GitHubTrendingRSS/daily/python.xml
+    category: tech
+
+  # ===== 中文科技/AI 媒体 =====
+  # 来源参考：weekend-project-space/top-rss-list（中文 RSS 订阅人数排名）
+  # 这些源能补充国内 AI 厂商/算力/政策类报道（阿里/腾讯/字节/百度等）
+  # 注意：rsshub.app 公共实例常被限流，未纳入；虎嗅/极客公园 RSS 当前返回空也未纳入
+  - name: 36氪
+    type: rss
+    url: https://36kr.com/feed
+    category: tech-zh
+
+  - name: IT之家
+    type: rss
+    url: https://www.ithome.com/rss/
+    category: tech-zh
+
+  - name: 爱范儿
+    type: rss
+    url: https://www.ifanr.com/feed
+    category: tech-zh
+
+  - name: 少数派
+    type: rss
+    url: https://sspai.com/feed
+    category: tech-zh
+
+  - name: 奇客 Solidot
+    type: rss
+    url: https://www.solidot.org/index.rss
+    category: tech-zh
+    enabled: false   # [2026-05-23] 用户判定为社区/聚合非新闻，移出搜索空间
+
+  - name: 美团技术团队
+    type: rss
+    url: https://tech.meituan.com/feed
+    category: official
+
+  - name: 有赞技术团队
+    type: rss
+    url: https://tech.youzan.com/rss/
+    category: official
+
+  - name: HelloGitHub 月刊
+    type: rss
+    url: http://hellogithub.com/rss
+    category: tech-zh
+
+  # === 中文 AI / 系统 / 架构垂直媒体 ===
+  - name: 机器之心
+    type: rss
+    url: https://www.jiqizhixin.com/rss
+    category: tech-zh
+
+  - name: 量子位
+    type: rss
+    url: https://www.qbitai.com/feed
+    category: tech-zh
+
+  - name: InfoQ 中文
+    type: rss
+    url: https://www.infoq.cn/feed
+    category: tech-zh
+
+  - name: 新智元
+    type: rss
+    url: https://www.aiera.com.cn/feed
+    category: tech-zh
+
   # ===== 关键词搜索源 =====
   - name: Google News
     type: keyword_search
@@ -63,6 +367,7 @@ sources:
     type: keyword_search
     url: https://hnrss.org/newest?q={q}
     category: tech
+    enabled: false   # [2026-05-23] 论坛/UGC 非新闻，移出搜索空间
 
   # Tavily：接近浏览器搜索的覆盖度（含国内/官方/非主流站）；免费档约 1000 次/月
   # 启用前 `export TAVILY_API_KEY=tvly-xxx`，否则该源会被跳过（不影响其他源）

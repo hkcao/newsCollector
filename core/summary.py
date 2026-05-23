@@ -23,6 +23,31 @@ _GNEWS_PLACEHOLDER_RE = re.compile(
     r"^\s*<a [^>]*href=[\"'][^\"']+[\"'][^>]*>[^<]+</a>\s*(&nbsp;|\s)*<font", re.I
 )
 
+# 网站侧边栏的促销 / 礼物 / "best of" 列表 —— Yahoo Finance / MSN 这类聚合站常把
+# sidebar 的内容当成 RSS summary 返回，必须识别为噪声直接丢弃
+# 例：- 给嫂子的最佳礼物 / - 给她的最佳生日礼物 / Best gifts for ...
+_PROMO_NOISE_PATTERNS = (
+    r"给[^。\n]{1,8}的最佳",        # 给嫂子的最佳礼物
+    r"最佳礼物",
+    r"最佳生日礼物",
+    r"结婚纪念日礼物",
+    r"best (?:gift|gifts) for",
+    r"best (?:birthday|anniversary|holiday) gift",
+    r"top \d+ (?:gifts|deals|products)",
+    r"sponsored content",
+    r"advertisement",
+    r"affiliate (?:link|disclosure)",
+)
+_PROMO_NOISE_RE = re.compile("|".join(_PROMO_NOISE_PATTERNS), re.IGNORECASE)
+
+
+def _looks_like_promo_noise(text: str) -> bool:
+    """如果文本里命中多次"礼物/最佳/sponsored"等模式，视为侧边栏噪声。"""
+    if not text:
+        return False
+    matches = _PROMO_NOISE_RE.findall(text)
+    return len(matches) >= 2  # 命中 2 次以上才算 —— 单次提及无害
+
 _HTML_TAG_RE = re.compile(r"<[^>]+>")
 _WS_RE = re.compile(r"\s+")
 _REDDIT_PREFIX_RE = re.compile(r"^submitted by\s+/u/\S+\s*", re.I)
@@ -33,7 +58,9 @@ _ARXIV_PREFIX_RE = re.compile(
 
 
 MIN_USABLE_CHARS = 60
-MAX_SUMMARY_CHARS = 400
+# 800 字符约等于一篇完整的 arxiv abstract / 一段完整的官方博客引子段；
+# 给做技术规划的用户足够多上下文，避免摘要切在 "无需……" 这种半句话上
+MAX_SUMMARY_CHARS = 800
 
 
 def clean_rss_summary(raw: str) -> str | None:
@@ -53,6 +80,10 @@ def clean_rss_summary(raw: str) -> str | None:
     text = _ARXIV_PREFIX_RE.sub("", text)
 
     if len(text) < MIN_USABLE_CHARS:
+        return None
+
+    # 侧边栏促销噪声：Yahoo Finance / MSN 经常把"最佳礼物"列表当作 summary 推出来
+    if _looks_like_promo_noise(text):
         return None
 
     # 太长时截到 MAX_SUMMARY_CHARS 并尽量收在句号

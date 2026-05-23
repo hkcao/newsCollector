@@ -12,7 +12,7 @@ from collectors.rss import fetch_all
 from collectors.url_decoder import decode_items_inplace
 from core.db import DB
 from core.normalizer import normalize
-from core.ranker import rank_all, translate_all, verify_all
+from core.ranker import rank_all, translate_all, verify_all, verify_titles
 from core.summary import clean_rss_summary
 
 
@@ -34,12 +34,7 @@ def compute_since_from_db(
     now = datetime.now(timezone.utc)
     if window_hours is not None:
         return now - timedelta(hours=window_hours)
-    last = db.get_meta(LAST_RUN_KEY)
-    if last:
-        try:
-            return datetime.fromisoformat(last)
-        except ValueError:
-            pass
+    # 默认固定 24h 窗口：不再以 last_run_at 收窄，避免高频运行时各分类凑不齐数据
     return now - timedelta(hours=24)
 
 
@@ -90,11 +85,12 @@ def collect_news(
     log(f"  命中且在窗口内：{len(items)} 条")
 
     stats = {"raw": len(raw), "matched": len(items),
-             "rss_used": 0, "llm_used": 0, "verify_fixed": 0, "translated": 0}
+             "rss_used": 0, "llm_used": 0, "verify_fixed": 0,
+             "title_fixed": 0, "translated": 0}
     grouped: dict[str, list[dict]] = {}
 
     if use_llm and items and llm_cfg is not None:
-        log("[3/5] LLM 按重要性筛选 (top_k 每关键词)…")
+        log("[3/5] LLM 按重要性筛选 (每个分类独立排序)…")
         log(f"  模型: {llm_cfg['model']}  base_url: {llm_cfg.get('base_url') or 'OpenAI default'}")
         grouped_raw = rank_all(items, keywords, llm_cfg, user_preference=user_preference)
 
@@ -112,6 +108,15 @@ def collect_news(
                     p["summary_source"] = "llm"
                     stats["llm_used"] += 1
             decode_items_inplace(picks)
+        # 解码后二次过滤黑名单域名（Google News 此时才暴露真实域名）
+        from core.normalizer import is_blacklisted_url
+        dropped_bl = 0
+        for cat, picks in list(grouped_raw.items()):
+            kept = [p for p in picks if not is_blacklisted_url(p.get("url", ""))]
+            dropped_bl += len(picks) - len(kept)
+            grouped_raw[cat] = kept
+        if dropped_bl:
+            log(f"  [二次过滤] 解码后丢弃 {dropped_bl} 条命中黑名单域名的 picks")
 
         if stats["llm_used"]:
             log("[5/5] 二次自检 (仅 LLM 生成的摘要)…")
@@ -119,6 +124,13 @@ def collect_news(
             stats["verify_fixed"] = sum(
                 1 for picks in grouped_raw.values() for p in picks if p.get("verified")
             )
+
+        # 标题幻觉核查（独立 pass，针对所有 picks 不只是 LLM 摘要）
+        log("[5/5] 标题反幻觉核查…")
+        verify_titles(grouped_raw, llm_cfg, keywords=keywords)
+        stats["title_fixed"] = sum(
+            1 for picks in grouped_raw.values() for p in picks if p.get("title_fixed")
+        )
 
         # RSS 原文摘要翻译（仅非中文）
         if stats["rss_used"]:

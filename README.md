@@ -10,7 +10,7 @@
 - **摘要忠实性**：原 RSS 摘要优先 → 否则 LLM 生成 → 二次自检剔除推测/扩写
 - **英文自动翻译**：RSS 原文是英文时走一次 LLM 翻译，保留专有名词
 - **官方源偏好**：避免转载导致的时效失真
-- **输出形式**：控制台 / HTML 报告 / 邮件 / 飞书 webhook
+- **输出形式**：控制台 / HTML 报告 / 邮件 / 飞书 webhook / 企业微信群机器人
 - **Streamlit GUI**：配置和结果都在浏览器界面里
 
 ## 快速开始
@@ -63,7 +63,29 @@ macOS 上如未安装 Python：`brew install python@3.12`。
 环境变量（优先级 > secrets.yaml）：
 - `LLM_API_KEY` — 代替 `config/llm.yaml` 里的 api_key
 - `TAVILY_API_KEY` — 启用 Tavily Search 源（不设则跳过；免费档 https://tavily.com 注册即得，约 1000 次/月）
-- `EMAIL_PASSWORD` / `FEISHU_WEBHOOK` — 推送通道
+- `EMAIL_PASSWORD` / `FEISHU_WEBHOOK` / `WECOM_WEBHOOK` — 推送通道
+
+## 推送通道
+
+### 企业微信群机器人（推荐推到群）
+
+1. 在企业微信群里 → 群设置 → 群机器人 → 添加 → 自定义机器人 → 复制 webhook URL
+2. 任选一种方式配置：
+   - **Streamlit GUI**：「🔔 通知设置」页面 → 「💼 企业微信群机器人」面板 → 填 URL → 保存
+   - **命令行**：把 `WECOM_WEBHOOK: https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx` 写进 `config/secrets.yaml`
+3. 验证 webhook 是否可达：
+
+```bash
+.venv/bin/python scripts/test_wecom.py
+```
+
+4. `config/notify.yaml` 中 `wecom.enabled` 默认已开启；每日定时任务（`main.py --daemon --at 09:00`）会自动推送
+
+消息以 markdown 形式分块发送（每块 < 4096 字节），可点击的标题直接跳到原文。如内容超过 `max_chunks` 块（默认 6 块，机器人 1 分钟限 20 条）会截断尾部。
+
+### 飞书 webhook / 邮件
+
+同样支持，配置方式见 `config/notify.yaml`。
 
 
 ## 排序逻辑（两层 rerank）

@@ -18,7 +18,7 @@ import yaml
 SECRETS_PATH_DEFAULT = Path(__file__).parent.parent / "config" / "secrets.yaml"
 
 # 当前支持的字段；不在白名单里的不会注入，避免误覆盖
-KNOWN_KEYS = {"TAVILY_API_KEY", "EMAIL_PASSWORD", "FEISHU_WEBHOOK", "LLM_API_KEY"}
+KNOWN_KEYS = {"TAVILY_API_KEY", "EMAIL_PASSWORD", "FEISHU_WEBHOOK", "WECOM_WEBHOOK", "LLM_API_KEY"}
 
 
 def load_secrets(path: Path = SECRETS_PATH_DEFAULT) -> dict[str, str]:

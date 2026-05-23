@@ -21,5 +21,15 @@ model: deepseek-chat
 # 留空 = 必须用环境变量 LLM_API_KEY
 api_key: ""
 
-top_k_per_keyword: 2
-max_candidates_per_keyword: 30
+# 排序单元已从「关键词」改为「分类」（6 个固定分类，见 core/ranker.py:CATEGORIES）：
+#   存储/基建产品、模型/框架/算法、基准评测、学术论文、政策导向、github趋势
+# 旧的 top_k_per_keyword / max_candidates_per_keyword 仍然兼容，作为新字段的回退默认值
+top_k_per_category: 5          # 每个分类最多输出条数
+max_candidates_per_category: 40  # 送 LLM 评估的候选池上限（每个分类，默认值）
+
+# 各分类差异化候选池上限（覆盖默认值；学术桶要保护 cs.DC/OS/PF 不被挤掉）
+# 不写就用 ranker.py 内置的 _CATEGORY_MAX_CANDIDATES
+# max_candidates_per_category_overrides:
+#   学术论文: 80
+#   基准评测: 30
+#   政策导向: 30
