@@ -14,7 +14,7 @@ history.sqlite.bak.*
 reports/*.html
 reports/theme_finds.json
 reports/_weekrun.log
-reports/debug/
+reports/debug/*.json
 
 # 本地配置（含 API key / 密码）—— 用 .example 模板
 config/llm.yaml
