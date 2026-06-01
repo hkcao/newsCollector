@@ -708,7 +708,9 @@ def page_run():
             save_yaml(CONFIG_DIR / "preference.yaml", {"text": user_preference.strip()})
 
         # 准备 keywords
-        config_keywords = load_yaml(CONFIG_DIR / "keywords.yaml", {"keywords": []})["keywords"]
+        _kw_data = load_yaml(CONFIG_DIR / "keywords.yaml", {"keywords": []})
+        config_keywords = _kw_data["keywords"]
+        watchlist = _kw_data.get("watchlist") or []
         if kw_override.strip():
             by_name = {k["name"].lower(): k for k in config_keywords}
             keywords = []
@@ -724,6 +726,7 @@ def page_run():
             return
 
         sources = load_yaml(CONFIG_DIR / "sources.yaml", {"sources": []})["sources"]
+        themes = load_yaml(CONFIG_DIR / "themes.yaml", {"themes": []}).get("themes", [])
 
         llm_cfg = None
         if use_llm:
@@ -757,6 +760,8 @@ def page_run():
                     use_llm=use_llm,
                     update_last_run=(window_hours is None and not use_all),
                     user_preference=user_preference.strip() or None,
+                    themes=themes,
+                    watchlist=watchlist,
                     log=log,
                 )
                 status.update(label="抓取完成 ✓", state="complete")
@@ -779,14 +784,16 @@ def page_run():
         if result["grouped"]:
             from main import flatten_to_render  # 借用现成的扁平化
             flat = flatten_to_render(result["grouped"])
-            html = render_html(flat, result["window_from"] or "all", result["window_to"])
+            html = render_html(flat, result["window_from"] or "all",
+                               result["window_to"], result.get("digest"))
             out = write_report(html, REPORTS_DIR)
             st.session_state["last_report_path"] = str(out)
             st.success(f"HTML 报告: {out}")
 
             if send_notify:
                 cfg = load_notify_config(CONFIG_DIR / "notify.yaml")
-                notify_all(flat, html, datetime.now().strftime("%Y-%m-%d"), cfg)
+                notify_all(flat, html, datetime.now().strftime("%Y-%m-%d"),
+                           cfg, result.get("digest"))
                 st.success("通知已发送")
 
     # 即使没刚跑，也显示最近一次结果
@@ -810,9 +817,23 @@ def page_run():
                 for src, n in by_src.most_common():
                     st.write(f"- **{n}** · {src}")
 
+        digest = result.get("digest") or {}
+        if digest.get("overview"):
+            st.markdown("#### 📊 今日概览")
+            st.info(digest["overview"])
+
         from main import flatten_to_render
         flat = flatten_to_render(result["grouped"])
         render_by_category(flat)
+
+        if digest.get("trends"):
+            st.markdown("#### 📈 趋势分析")
+            for i, t in enumerate(digest["trends"], 1):
+                st.markdown(f"{i}. {t}")
+        if digest.get("advice"):
+            st.markdown("#### 💡 给存储技术规划的建议")
+            for i, a in enumerate(digest["advice"], 1):
+                st.markdown(f"{i}. {a}")
 
 
 # =========================================================================

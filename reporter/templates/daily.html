@@ -124,6 +124,7 @@
   .cat-学术论文 .marker { background: #8250df; }
   .cat-政策导向 .marker { background: #cf222e; }
   .cat-github趋势 .marker { background: #1f883d; }
+  .cat-AI意见领袖 .marker { background: #d63384; }
   .cat-header h2 {
     margin: 0;
     font-size: 18px;
@@ -208,6 +209,48 @@
     line-height: 1.7;
   }
 
+  /* ---------- Synthesis blocks (概览 / 趋势 / 建议) ---------- */
+  .synth {
+    margin: 24px 0 8px;
+    padding: 18px 20px;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 8px;
+    background: var(--surface);
+  }
+  .synth-overview { border-left-color: var(--accent); }
+  .synth-trends { border-left-color: #bf8700; }
+  .synth-advice { border-left-color: #1f883d; }
+  .synth h2 {
+    margin: 0 0 10px;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+  }
+  .synth p { margin: 0; font-size: 14.5px; line-height: 1.75; }
+  .synth ol { margin: 0; padding-left: 20px; }
+  .synth ol li { margin: 7px 0; font-size: 14px; line-height: 1.7; }
+
+  /* 多源标注 📎 来源 */
+  .item-sources {
+    margin-top: 8px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--fg-dim);
+  }
+  .item-sources .lbl { color: var(--fg-muted); }
+
+  /* 下期预告 / 免责 */
+  .closing {
+    margin-top: 40px;
+    padding: 14px 18px;
+    border: 1px dashed var(--border-strong);
+    border-radius: 8px;
+    font-size: 12.5px;
+    color: var(--fg-muted);
+    line-height: 1.7;
+  }
+
   /* ---------- Footer ---------- */
   .footer {
     margin-top: 64px;
@@ -224,18 +267,25 @@
 </head>
 <body>
   <div class="header">
-    <div class="eyebrow">// Tech Daily Digest</div>
-    <h1>每日资讯<span class="date-chip">{{ date }}</span></h1>
+    <div class="eyebrow">// AI 存储技术规划 · Daily Digest</div>
+    <h1>AI 存储技术日报<span class="date-chip">{{ date }}</span></h1>
     <div class="meta">
       <span>window</span>
       <span class="sep">›</span>
       <span>{{ window_from }} → {{ window_to }}</span>
       <span class="sep">·</span>
-      <span>{{ total }} items</span>
+      <span>{{ total }} 条</span>
       <span class="sep">·</span>
-      <span>{{ by_category|length }} categories</span>
+      <span>{{ by_category|length }} 个分类</span>
     </div>
   </div>
+
+  {% if digest and digest.overview %}
+  <div class="synth synth-overview">
+    <h2>📊 今日概览</h2>
+    <p>{{ digest.overview }}</p>
+  </div>
+  {% endif %}
 
   {% if by_category %}
   <nav class="toc">
@@ -271,6 +321,9 @@
         {% if p.translated %}<span class="chip translated">已翻译</span>{% endif %}
       </div>
       <div class="item-summary">{{ p.summary }}</div>
+      {% if p.cross_sources and p.cross_sources|length > 1 %}
+      <div class="item-sources"><span class="lbl">📎 来源：</span>{{ p.cross_sources | join(' / ') }}</div>
+      {% endif %}
     </article>
     {% endfor %}
   </section>
@@ -281,6 +334,28 @@
     — no items in this window —
   </div>
   {% endif %}
+
+  {% if digest and digest.trends %}
+  <div class="synth synth-trends">
+    <h2>📈 趋势分析</h2>
+    <ol>
+      {% for t in digest.trends %}<li>{{ t }}</li>{% endfor %}
+    </ol>
+  </div>
+  {% endif %}
+
+  {% if digest and digest.advice %}
+  <div class="synth synth-advice">
+    <h2>💡 给存储技术规划的建议</h2>
+    <ol>
+      {% for a in digest.advice %}<li>{{ a }}</li>{% endfor %}
+    </ol>
+  </div>
+  {% endif %}
+
+  <div class="closing">
+    本日报由 newsCollector 自动整理，信息来源于公开 RSS / 新闻搜索，仅供 AI 存储技术规划参考，不构成采购或投资依据。
+  </div>
 
   <div class="footer">
     <span class="brand">newsCollector</span> · generated {{ generated_at }}

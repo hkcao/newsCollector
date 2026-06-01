@@ -141,6 +141,10 @@ def fetch_rss(url: str, source_name: str, category: str) -> list[dict]:
 def _build_tasks(sources: list[dict], keywords: list[dict]) -> list[dict]:
     """把所有源展开成扁平的 fetch task 列表（每个 task = 一次 HTTP 请求）。"""
     tasks: list[dict] = []
+    # 外部 RSS 中继基址（自建 RSSHub / wechat2rss，用于微信公众号等无原生 RSS 的源）。
+    # URL 含 {base} 的源用它拼接；未设置则整批跳过（不报错），见 README「微信公众号源」。
+    relay_base = os.getenv("RSSHUB_BASE", "").strip().rstrip("/")
+    skipped_relay: list[str] = []
     for src in sources:
         if src.get("enabled", True) is False:
             print(f"  [SKIP] {src.get('name')} (enabled=false)")
@@ -148,20 +152,29 @@ def _build_tasks(sources: list[dict], keywords: list[dict]) -> list[dict]:
         stype = src.get("type", "rss")
         cat = src.get("category", "")
         if stype == "rss":
+            url = src["url"]
+            if "{base}" in url:  # 需中继的源（微信公众号等）
+                if not relay_base:
+                    skipped_relay.append(src["name"])
+                    continue
+                url = url.replace("{base}", relay_base)
             tasks.append({
-                "type": "rss", "url": src["url"],
+                "type": "rss", "url": url,
                 "tag": src["name"], "category": cat, "label": f"[RSS] {src['name']}",
             })
         elif stype == "keyword_search":
             for kw in keywords:
-                q = quote_plus(kw["name"])
-                tasks.append({
-                    "type": "rss",
-                    "url": src["url"].format(q=q),
-                    "tag": f"{src['name']}({kw['name']})",
-                    "category": cat,
-                    "label": f"[SEARCH] {src['name']}({kw['name']})",
-                })
+                # 搜 name + search_as 里列的"独特别名"（如 Milvus 的 Lakebase、DeepSeek 的
+                # Reasonix）——光搜 name 搜不到这些子事件，必须直接搜独特产品名
+                for term in [kw["name"]] + list(kw.get("search_as") or []):
+                    q = quote_plus(term)
+                    tasks.append({
+                        "type": "rss",
+                        "url": src["url"].format(q=q),
+                        "tag": f"{src['name']}({term})",
+                        "category": cat,
+                        "label": f"[SEARCH] {src['name']}({term})",
+                    })
         elif stype == "tavily":
             from collectors.web_search import resolve_api_key
             env_name = src.get("api_key_env", "TAVILY_API_KEY")
@@ -170,19 +183,23 @@ def _build_tasks(sources: list[dict], keywords: list[dict]) -> list[dict]:
                 print(f"  [TAVILY] 跳过 {src['name']}：环境变量 {env_name} 未设置")
                 continue
             for kw in keywords:
-                tasks.append({
-                    "type": "tavily",
-                    "keyword": kw["name"],
-                    "tag": f"{src['name']}({kw['name']})",
-                    "category": cat,
-                    "api_key": api_key,
-                    "days": src.get("days", 2),
-                    "max_results": src.get("max_results", 10),
-                    "topic": src.get("topic", "news"),
-                    "label": f"[TAVILY] {src['name']}({kw['name']})",
-                })
+                for term in [kw["name"]] + list(kw.get("search_as") or []):
+                    tasks.append({
+                        "type": "tavily",
+                        "keyword": term,
+                        "tag": f"{src['name']}({term})",
+                        "category": cat,
+                        "api_key": api_key,
+                        "days": src.get("days", 2),
+                        "max_results": src.get("max_results", 10),
+                        "topic": src.get("topic", "news"),
+                        "label": f"[TAVILY] {src['name']}({term})",
+                    })
         else:
             print(f"  [WARN] 未知 source type: {stype} ({src.get('name')})")
+    if skipped_relay:
+        print(f"  [中继源] 跳过 {len(skipped_relay)} 个需中继的源（微信公众号等）："
+              f"未设置 RSSHUB_BASE，自建 RSSHub/wechat2rss 后即可启用，详见 README")
     return tasks
 
 

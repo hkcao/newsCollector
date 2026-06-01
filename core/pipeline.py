@@ -11,6 +11,7 @@ from typing import Callable
 from collectors.rss import fetch_all
 from collectors.url_decoder import decode_items_inplace
 from core.db import DB
+from core.digest import build_digest
 from core.normalizer import normalize
 from core.ranker import rank_all, translate_all, verify_all, verify_titles
 from core.summary import clean_rss_summary
@@ -48,6 +49,8 @@ def collect_news(
     use_llm: bool = True,
     update_last_run: bool = True,
     user_preference: str | None = None,
+    themes: list[dict] | None = None,
+    watchlist: list[str] | None = None,
     log: Callable[[str], None] = _noop,
 ) -> dict:
     """执行完整流程，返回:
@@ -80,14 +83,18 @@ def collect_news(
     raw = list(fetch_all(sources, keywords))
     log(f"  抓取完毕：{len(raw)} 条原始数据")
 
-    log("[2/5] 去重 + 关键词匹配 + 客观打分（SQLite delta）…")
-    items = normalize(raw, keywords, db=db, since=since)
+    log("[2/5] 去重 + 关键词匹配 + 语义主题门 + 客观打分（SQLite delta）…")
+    # themes + llm_cfg 都在、且本次用 LLM 时，启用语义主题门按内容召回未命中关键词的媒体条目
+    items = normalize(raw, keywords, db=db, since=since,
+                      themes=themes, llm_cfg=(llm_cfg if use_llm else None),
+                      watchlist=watchlist)
     log(f"  命中且在窗口内：{len(items)} 条")
 
     stats = {"raw": len(raw), "matched": len(items),
              "rss_used": 0, "llm_used": 0, "verify_fixed": 0,
              "title_fixed": 0, "translated": 0}
     grouped: dict[str, list[dict]] = {}
+    digest: dict = {"overview": "", "trends": [], "advice": []}
 
     if use_llm and items and llm_cfg is not None:
         log("[3/5] LLM 按重要性筛选 (每个分类独立排序)…")
@@ -99,7 +106,8 @@ def collect_news(
             for p in picks:
                 p["raw_rss_summary"] = p.get("summary", "")
                 rss = clean_rss_summary(p["raw_rss_summary"])
-                if rss:
+                # 意见领袖发言用 LLM 中文转述（含"为何值得知道"），不回退原始英文推文
+                if rss and p.get("llm_category") != "AI意见领袖":
                     p["summary"] = rss
                     p["summary_source"] = "rss"
                     stats["rss_used"] += 1
@@ -143,6 +151,9 @@ def collect_news(
             stats["translated"] = 0
         grouped = grouped_raw
 
+        log("[5/5] 综合层：今日概览 / 趋势 / 建议…")
+        digest = build_digest(grouped_raw, llm_cfg)
+
     if update_last_run and not use_all and window_hours is None:
         db.set_meta(LAST_RUN_KEY, now.isoformat())
     db.close()
@@ -150,6 +161,7 @@ def collect_news(
     return {
         "items": items,
         "grouped": grouped,
+        "digest": digest,
         "stats": stats,
         "window_from": since.isoformat() if since else None,
         "window_to": now.isoformat(),

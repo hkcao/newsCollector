@@ -5,6 +5,14 @@
 #           厂商、产品、协议、开源项目、概念，统统纳入。
 # ===========================================================================
 
+# 重点关注名单（watchlist）：你长期跟踪、希望"只要当周有新闻就别被埋掉"的具体词。
+# 命中（标题/摘要含其一）的条目会被**保送进 LLM 候选池前排**并打【重点关注】标，
+# 绕过"单源低客观分被 top-N 截断"的问题（这类小众产品常只来自 Google News 单源）。
+# 是否最终入选仍由 LLM 判断（纯转载/无实质进展可不选），但不会再在 LLM 之前就被丢。
+watchlist: []
+  # 示例：- Reasonix    # 想强制某个具体事件一定出现在报告时再填；
+  #       - Lakebase    # 日常优先靠"追踪厂商 + 主题门"做内容召回，尽量不在这里枚举产品名。
+
 keywords:
 
 # ===== AI 存储厂商（含官方域名，权威首发优先） =====
@@ -201,6 +209,42 @@ keywords:
   - DeepSeek 3FS
   - Fire-Flyer File System
 
+- name: AgentFS
+  # 面向 AI agent 的文件系统（新兴形态）
+  case_sensitive: true
+  aliases:
+  - Agent FS
+  - agentfs
+  - agent file system
+
+- name: parallel file system
+  # 高性能并行 / 分布式文件系统通用概念，补齐未单列厂商的 PFS 报道
+  aliases:
+  - 并行文件系统
+  - 高性能并行文件系统
+  - 高性能文件系统
+  - 分布式并行文件系统
+  - parallel filesystem
+  - HPC parallel file system
+  - HPC file system
+  - shared parallel file system
+
+- name: KV file system
+  # NVIDIA 等的 KV 缓存文件系统 / KV 存储层（推理 KV cache 外置到文件系统）
+  case_sensitive: true
+  match_aliases_only: true
+  aliases:
+  - KVFS
+  - KV cache file system
+  - KV-cache file system
+  - KV cache filesystem
+  - KVCache file system
+  - NVIDIA KV file system
+  - NV KV file system
+  - KV 文件系统
+  - KV cache 文件系统
+  - KV storage tier
+
 # ===== GPU IO / 数据通路 =====
 - name: GPUDirect
   aliases:
@@ -327,6 +371,20 @@ keywords:
   - AI dataplatform
   - AI data fabric
   - data lakehouse for AI
+
+# Databricks：Lakehouse + Unity Catalog + Mosaic AI + Genie + Lakebase（lakehouse 原生
+# OLTP/向量库）等的核心 AI 数据平台厂商。追踪**厂商**即可让其新产品从内容进入候选池，
+# 不必逐个枚举产品名——如搜 "Databricks" 自然召回 Lakebase 的报道。
+- name: Databricks
+  case_sensitive: true
+  aliases:
+  - Unity Catalog
+  - Mosaic AI
+  - Lakeflow
+  - Delta Lake
+  official_domains:
+  - databricks.com
+  - www.databricks.com
 
 - name: Iceberg
   case_sensitive: true
@@ -1100,11 +1158,18 @@ keywords:
 
 # ===== 训练/推理范式与算法（影响算力 + 存储需求） =====
 - name: MoE
+  # 裸 "MoE" 会撞 Ministry of Education（如 "MoE released 20% grants"）等无关内容，
+  # 走 match_aliases_only：只匹配明确指向"专家混合"的短语，name 仅作显示
   case_sensitive: true
+  match_aliases_only: true
   aliases:
   - Mixture of Experts
+  - Mixture-of-Experts
   - 专家混合
   - sparse MoE
+  - MoE model
+  - MoE LLM
+  - MoE architecture
   - expert parallelism
 
 - name: RLHF
@@ -1125,6 +1190,16 @@ keywords:
   - context extension
   - YaRN
   - RingAttention
+
+- name: vibe coding
+  # 大神范式观点（Karpathy 等）：常见于技术解读/访谈报道，配合 X 意见领袖源捕获一手发言
+  aliases:
+  - vibecoding
+  - vibe-coding
+  - Software 3.0
+  - software3.0
+  - Software 2.0
+  - 氛围编程
 
 - name: agentic
   aliases:
@@ -1207,6 +1282,14 @@ keywords:
   - Ascend 910C
   - CloudMatrix
   - MindSpore
+  - Tao 定律
+  - tao定律
+  - 陶定律
+  - Tao law
+  - 华为 Tao
+  search_as:
+  - 华为 Tao 定律
+  - Huawei Tao law
 
 - name: Cambricon
   aliases:

@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>newsCollector 实现方案 · AI 存储技术情报系统</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1d212b; --line:#2a2f3a;
+    --txt:#d7dce5; --mut:#8b93a3; --acc:#4fa3ff; --acc2:#7ee787;
+    --warn:#f0a35e; --pink:#ff7b9c; --code:#11141a;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    line-height:1.7; font-size:15px;
+  }
+  .wrap{max-width:980px; margin:0 auto; padding:48px 28px 96px}
+  header.hero{
+    border-bottom:1px solid var(--line); padding-bottom:28px; margin-bottom:36px;
+  }
+  h1{font-size:30px; margin:0 0 8px; letter-spacing:.5px}
+  h1 .v{color:var(--acc); font-size:18px; font-weight:500}
+  .sub{color:var(--mut); font-size:15px}
+  h2{
+    font-size:22px; margin:48px 0 16px; padding-left:12px;
+    border-left:4px solid var(--acc); line-height:1.3;
+  }
+  h3{font-size:17px; margin:28px 0 10px; color:#eaeef5}
+  h4{font-size:15px; margin:18px 0 6px; color:var(--acc2)}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0; padding-left:24px}
+  li{margin:5px 0}
+  code{
+    background:var(--code); padding:1px 6px; border-radius:4px;
+    font-family:"SF Mono",Menlo,Consolas,monospace; font-size:13px; color:#e6c07b;
+  }
+  pre{
+    background:var(--code); border:1px solid var(--line); border-radius:8px;
+    padding:16px 18px; overflow-x:auto; font-size:13px; line-height:1.55;
+    font-family:"SF Mono",Menlo,Consolas,monospace; color:#c8d0dc;
+  }
+  .panel{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:20px 24px; margin:16px 0;
+  }
+  .grid{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:16px 0}
+  .card{
+    background:var(--panel2); border:1px solid var(--line); border-radius:8px;
+    padding:14px 16px;
+  }
+  .card h4{margin-top:0}
+  .tag{
+    display:inline-block; background:#26303f; color:var(--acc);
+    border:1px solid #2f3d50; border-radius:5px; padding:1px 8px;
+    font-size:12px; margin:2px 4px 2px 0;
+  }
+  .tag.g{background:#1f3326; color:var(--acc2); border-color:#2c4a36}
+  .tag.w{background:#3a2e1f; color:var(--warn); border-color:#4d3c28}
+  .tag.p{background:#3a2230; color:var(--pink); border-color:#522f40}
+  table{border-collapse:collapse; width:100%; margin:14px 0; font-size:13.5px}
+  th,td{border:1px solid var(--line); padding:8px 11px; text-align:left; vertical-align:top}
+  th{background:var(--panel2); color:#eaeef5; font-weight:600}
+  td code{font-size:12px}
+  .flow{counter-reset:step; margin:18px 0}
+  .flow .step{
+    position:relative; padding:14px 18px 14px 56px; margin:10px 0;
+    background:var(--panel); border:1px solid var(--line); border-radius:9px;
+  }
+  .flow .step::before{
+    counter-increment:step; content:counter(step);
+    position:absolute; left:14px; top:14px; width:28px; height:28px;
+    background:var(--acc); color:#06101d; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-weight:700; font-size:14px;
+  }
+  .flow .step .t{font-weight:600; color:#eaeef5; font-size:15.5px}
+  .flow .step .d{color:var(--mut); font-size:13.5px; margin-top:3px}
+  .note{
+    background:#16202b; border-left:3px solid var(--acc);
+    padding:10px 16px; margin:14px 0; border-radius:0 6px 6px 0; font-size:14px;
+  }
+  .warnbox{
+    background:#241c14; border-left:3px solid var(--warn);
+    padding:10px 16px; margin:14px 0; border-radius:0 6px 6px 0; font-size:14px;
+  }
+  .mut{color:var(--mut)}
+  .toc{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:18px 24px; margin:24px 0; columns:2; column-gap:32px;
+  }
+  .toc a{color:var(--acc); text-decoration:none; display:block; padding:3px 0; font-size:14px}
+  .toc a:hover{text-decoration:underline}
+  .arrow{color:var(--acc); font-weight:700; margin:0 6px}
+  .pipechain{
+    font-family:"SF Mono",Menlo,monospace; font-size:13px; background:var(--code);
+    border:1px solid var(--line); border-radius:8px; padding:16px; line-height:2.1;
+  }
+  .pipechain .b{display:inline-block; background:#26303f; border:1px solid #2f3d50;
+    color:var(--acc); border-radius:5px; padding:2px 9px; margin:2px}
+  hr{border:none; border-top:1px solid var(--line); margin:40px 0}
+  .small{font-size:13px}
+  .kicker{color:var(--acc2); font-size:13px; letter-spacing:1px; text-transform:uppercase}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <div class="kicker">实现方案 · Implementation Spec</div>
+  <h1>newsCollector <span class="v">v0.3</span></h1>
+  <p class="sub">面向「资深 AI 存储技术规划与分析师」的全网技术情报采集 · 筛选 · 日报系统</p>
+  <p class="sub small">从全网技术资讯中，挑出「对存储 + AI 基建规划决策真正有用」的最新信号，每日生成结构化中文日报。</p>
+</header>
+
+<div class="toc">
+  <a href="#overview">0 · 系统总览与设计目标</a>
+  <a href="#sources">1 · 数据源</a>
+  <a href="#fetch">2 · 抓取层（提取）</a>
+  <a href="#normalize">3 · 归一化：去重 / 时窗 / 匹配</a>
+  <a href="#quality">4 · 质量过滤</a>
+  <a href="#themegate">5 · 语义主题门（召回）</a>
+  <a href="#score">6 · 客观打分</a>
+  <a href="#collapse">7 · 跨源聚合与事件折叠</a>
+  <a href="#llm">8 · LLM 分类排序</a>
+  <a href="#summary">9 · 摘要 / 自检 / 翻译 / 核查</a>
+  <a href="#digest">10 · 综合层（今日概览）</a>
+  <a href="#output">11 · 报告输出与推送</a>
+  <a href="#pipeline">12 · 完整流程图</a>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="overview">0 · 系统总览与设计目标</h2>
+
+<p>本系统是一个单次运行（或定时守护）的命令行管线：每次运行从数十个数据源并发抓取原始资讯，
+经过<strong>多层客观过滤 + 打分</strong>把噪声压下去，再交给 <strong>LLM 按用户身份逐分类挑选</strong>，
+最后生成一份结构化的中文 HTML 日报并推送。</p>
+
+<div class="panel">
+<h4>核心设计原则</h4>
+<ul>
+  <li><strong>身份驱动</strong>：所有筛选维度都围绕一个虚拟读者 —— 「为大规模 AI 训练/推理集群做存储栈选型、容量/带宽规划、架构演进、TCO 测算、跨厂商对标」的分析师。</li>
+  <li><strong>客观先行、LLM 收尾</strong>：用规则/打分把 100+ 候选压到可控规模（省 token、保判断质量），LLM 只在高信噪比的候选池里做「重要性」终选。</li>
+  <li><strong>宁缺毋滥</strong>：每个分类候选不够格就少选甚至空列表，不为凑数放低质内容。</li>
+  <li><strong>反幻觉</strong>：摘要优先用 RSS 原文；LLM 生成的摘要要二次自检；标题里的数字/公司主体必须能在原文中找到，否则强制重写。</li>
+  <li><strong>绝不伪造时间戳</strong>：拿不到发布日期的条目一律视为「时间未知」，在限定时间窗的运行里宁可丢弃。</li>
+</ul>
+</div>
+
+<table>
+<tr><th>层</th><th>模块</th><th>职责</th></tr>
+<tr><td>入口</td><td><code>main.py</code></td><td>编排 5 个阶段、时间窗、CLI/daemon</td></tr>
+<tr><td>采集</td><td><code>collectors/rss.py</code>, <code>web_search.py</code>, <code>url_decoder.py</code></td><td>并发抓 RSS / 搜索 / Tavily，Google News URL 解码</td></tr>
+<tr><td>处理</td><td><code>core/normalizer.py</code></td><td>去重 / 时窗 / 关键词匹配 / 质量过滤 / 打分 / 折叠</td></tr>
+<tr><td>召回</td><td><code>core/theme_gate.py</code></td><td>未命中关键词的媒体条目按语义召回</td></tr>
+<tr><td>排序</td><td><code>core/ranker.py</code></td><td>硬分桶 → 粗筛 → LLM 终选 → 摘要 / 自检 / 翻译 / 标题核查</td></tr>
+<tr><td>综合</td><td><code>core/digest.py</code></td><td>跨条目「今日概览 / 趋势 / 建议」</td></tr>
+<tr><td>存储</td><td><code>core/db.py</code> (SQLite)</td><td>历史信号快照，算 24h 增量 delta</td></tr>
+<tr><td>输出</td><td><code>reporter/render.py</code>, <code>notify.py</code></td><td>Jinja2 HTML 日报 + 推送（企业微信等）</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="sources">1 · 数据源</h2>
+
+<p>数据源集中配置在 <code>config/sources.yaml</code>，每个源声明 <code>type</code>、<code>category</code> 与 <code>enabled</code> 开关。
+共三种采集类型：</p>
+
+<div class="grid">
+  <div class="card">
+    <h4>type: rss <span class="tag">直接拉</span></h4>
+    <p class="small">固定 RSS/Atom URL，整体抓回后再做关键词匹配。涵盖官方博客、行业媒体、arXiv、GitHub Trending、中文媒体、意见领袖。</p>
+  </div>
+  <div class="card">
+    <h4>type: keyword_search <span class="tag w">逐关键词</span></h4>
+    <p class="small">把每个关键词（+ <code>search_as</code> 独特别名）替换进 URL 的 <code>{q}</code>，每个词发一次请求。当前主力是 <strong>Google News RSS 搜索</strong>。</p>
+  </div>
+  <div class="card">
+    <h4>type: tavily <span class="tag p">搜索 API</span></h4>
+    <p class="small">走 Tavily Search API，接近浏览器搜索覆盖度（含国内/官方/非主流站），弥补 Google News 盲区。免费档约 1000 次/月，需 <code>TAVILY_API_KEY</code>。</p>
+  </div>
+  <div class="card">
+    <h4>微信公众号 <span class="tag">需中继</span></h4>
+    <p class="small">公众号无官方 RSS，URL 含 <code>{base}</code> 占位，需自建 wechat2rss / RSSHub 并设 <code>RSSHUB_BASE</code>，未配置时整批静默跳过。</p>
+  </div>
+</div>
+
+<h3>1.1 源的分组</h3>
+<table>
+<tr><th>分组</th><th>category</th><th>代表源</th><th>作用</th></tr>
+<tr><td>官方一手源</td><td><code>official</code></td><td>vLLM、NVIDIA、VAST、WEKA、Pure、OpenAI、DeepMind、Hugging Face、PyTorch、AWS、各大厂研究博客</td><td>首发、权威，源质量分最高</td></tr>
+<tr><td>存储/AI 基建垂直媒体</td><td><code>storage</code> / <code>ai-infra</code></td><td>Blocks &amp; Files、The Register、The Next Platform、StorageReview、SemiAnalysis</td><td>分析师每日必读英文行业站</td></tr>
+<tr><td>学术论文</td><td><code>paper</code></td><td>arXiv cs.AI/LG/DC/OS/AR/PF/DB、HF Daily Papers</td><td>研究首发、新基准/数据集</td></tr>
+<tr><td>GitHub 趋势</td><td><code>tech</code></td><td>GitHubTrendingRSS（daily/weekly/python）</td><td>开源项目动态</td></tr>
+<tr><td>中文科技/AI 媒体</td><td><code>tech-zh</code></td><td>36氪、IT之家、机器之心、量子位、InfoQ、新智元、雷峰网</td><td>国内厂商/算力/政策报道</td></tr>
+<tr><td>AI 意见领袖</td><td><code>influencer</code></td><td>X/Twitter（经 nitter）：Karpathy、Andrew Ng、Tri Dao、Jim Fan、Soumith、Sam Altman</td><td>行业风向标，一手发言</td></tr>
+<tr><td>关键词搜索</td><td><code>news</code></td><td>Google News、Tavily News</td><td>兜底全网覆盖</td></tr>
+</table>
+
+<div class="note">
+源的存活性是被持续维护的：许多官方博客的 RSS 已失效（403 反爬 / 410 下线 / 改版无 feed），
+对应条目被标 <code>enabled: false</code> 并注明日期与原因，改由 <strong>Google News(厂商名)</strong> 兜底。
+HackerNews / Reddit / Solidot 因被判定为「论坛/UGC 非新闻」而整体移出搜索空间。
+</div>
+
+<h3>1.2 关键词与主题配置</h3>
+<table>
+<tr><th>文件</th><th>内容</th></tr>
+<tr><td><code>config/keywords.yaml</code></td><td>追踪关键词清单。每个词可带 <code>aliases</code>（别名）、<code>official_domains</code>（权威域名）、<code>case_sensitive</code>、<code>match_aliases_only</code>、<code>search_as</code>（搜索专用独特别名）。覆盖存储厂商、文件系统、GPU IO、互联协议、KV cache/checkpoint、向量库/数据平台、云厂商、大模型、训练推理框架、AI 芯片、基准评测、行业标准等约 100+ 词。</td></tr>
+<tr><td><code>config/keywords.yaml → watchlist</code></td><td>「重点关注名单」：长期跟踪、希望「只要当周有新闻就别被埋掉」的词。命中条目被保送进 LLM 候选池前排并打【重点关注】标，LLM 漏选时还会保底补回。</td></tr>
+<tr><td><code>config/themes.yaml</code></td><td>语义主题清单（供主题门召回）：KV cache、向量/图数据库、并行文件系统、checkpoint、GPU IO。每个主题含 <code>keyword</code>（归入哪个既有关键词）、<code>definition</code>（喂给 LLM 的定义）、<code>vocab</code>（本地粗筛词表）。</td></tr>
+<tr><td><code>config/llm.yaml</code></td><td>LLM 配置：当前用 <strong>MiniMax-M2.7</strong>（OpenAI 兼容接口），<code>top_k_per_category=6</code>、<code>max_candidates_per_category=55</code>。</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="fetch">2 · 抓取层（提取）</h2>
+
+<p>采集核心在 <code>collectors/rss.py</code> 的 <code>fetch_all()</code>。所有源（含每个搜索关键词的每次查询）
+被展开成<strong>扁平的 task 列表</strong>，每个 task = 一次 HTTP 请求，全部丢进线程池并发执行。</p>
+
+<h3>2.1 任务展开（_build_tasks）</h3>
+<ul>
+  <li><code>type=rss</code>：1 个源 = 1 个 task。</li>
+  <li><code>type=keyword_search</code>：对每个关键词，搜 <code>name</code> + 其 <code>search_as</code> 列出的独特别名（如华为的「Tao 定律」），各发一次 → N 个 task。</li>
+  <li><code>type=tavily</code>：同理对每个关键词 + 别名各查一次，需 API key，未配置则跳过。</li>
+</ul>
+
+<h3>2.2 HTTP 抓取层（httpx，替代 feedparser 裸 urllib）</h3>
+<p>feedparser 内置的 urllib 没超时、没重试、没 UA、不限并发，对 news.google.com / hnrss.org 这类单 host 高并发源会大面积 SSL EOF / 502。因此自建 <code>http_get_bytes()</code>：</p>
+<ul>
+  <li>浏览器 User-Agent + 20s 超时（<code>NEWS_HTTP_TIMEOUT</code>）+ 跟随 301/302 跳转。</li>
+  <li><strong>每主机并发限流</strong>：同一 host 最多 4 个并发（<code>NEWS_PER_HOST_LIMIT</code>），用 host 级信号量。</li>
+  <li><strong>分级重试</strong>：4xx（除 429）视为永久失败立即放弃；429 / 5xx / 网络错误 / 超时视为瞬时，指数退避重试 3 次。退避在释放信号量之后进行，不占着名额睡觉。</li>
+  <li>线程池默认 16 worker（<code>NEWS_FETCH_WORKERS</code>），<code>as_completed</code> 流式 yield。</li>
+</ul>
+
+<h3>2.3 统一 item schema</h3>
+<p>无论来自哪种源，每条原始数据都被归一化成同一结构：</p>
+<pre>{
+  "id":       sha1(url|title)[:16],   # 去重主键
+  "source":   "源名（搜索源带 (关键词) 后缀）",
+  "category": "official | storage | paper | news | influencer ...",
+  "title":    "...",
+  "url":      "...",
+  "summary":  "原始 RSS 摘要 / Tavily content（可能含 HTML）",
+  "published":"UTC ISO 字符串，拿不到则为空串（绝不伪造 now）",
+  "signals":  {points, comments, tavily_score, ...},   # 各源能给的客观信号
+  "matched_keywords": []              # 由 normalizer 填
+}</pre>
+
+<div class="note">
+<strong>发布时间解析</strong>：依次尝试 <code>published_parsed / updated_parsed / published / updated / pubDate / date</code>，
+全失败返回空串。空串在后续时间窗里被当作「未知发布时间」处理 —— 这是「绝不伪造时间戳」原则的落点。
+</div>
+
+<!-- ============================================================ -->
+<h2 id="normalize">3 · 归一化：去重 / 时窗 / 关键词匹配</h2>
+
+<p>抓回的原始条目进入 <code>core/normalizer.py</code> 的 <code>normalize()</code>，依次执行下列步骤。</p>
+
+<div class="flow">
+  <div class="step"><div class="t">去重（dedupe）</div><div class="d">按 <code>id</code>（url+title 的 sha1）去掉重复条目。</div></div>
+  <div class="step"><div class="t">时间窗过滤（after / since）</div><div class="d">只保留 <code>published &ge; since</code> 的条目。<strong>无可解析日期 → 直接丢弃</strong>（限定窗口里宁缺勿滥，避免无法证明在窗口内的旧闻漏进来）。</div></div>
+  <div class="step"><div class="t">关键词匹配（match_keywords）</div><div class="d">在 <code>title + summary</code> 上匹配关键词及别名，命中则写入 <code>matched_keywords</code>。</div></div>
+  <div class="step"><div class="t">质量过滤（is_low_quality）</div><div class="d">命中关键词后再过一道质量闸（见第 4 节）。</div></div>
+  <div class="step"><div class="t">语义主题门（theme_gate）</div><div class="d">未命中关键词、但来自具名媒体源的条目按内容召回（见第 5 节）。</div></div>
+  <div class="step"><div class="t">delta 计算（SQLite）</div><div class="d">从历史快照算 <code>delta_24h</code>（热度增量），并把当前信号 upsert 落库。</div></div>
+  <div class="step"><div class="t">跨源聚合 + 事件折叠</div><div class="d">统计同事件被几家媒体报道、折叠近重复转载（见第 7 节）。</div></div>
+  <div class="step"><div class="t">watchlist 标记 + 打分</div><div class="d">标记重点关注条目，给每条算客观分 <code>score</code>（见第 6 节）。</div></div>
+</div>
+
+<h3>3.1 时间窗逻辑（compute_since）</h3>
+<table>
+<tr><th>模式</th><th>窗口起点</th></tr>
+<tr><td>默认</td><td>过去固定 24h（不再用 <code>last_run_at</code> 收窄，避免高频运行时各分类凑不齐数据）</td></tr>
+<tr><td><code>--window-hours N</code></td><td>强制过去 N 小时，且不更新 <code>last_run_at</code></td></tr>
+<tr><td><code>--all</code></td><td>不限时间窗（<code>since=None</code>）</td></tr>
+</table>
+<p class="small mut">内部一律存 UTC，显示时转本地时区（<code>fmt_local</code>）。</p>
+
+<h3>3.2 关键词匹配规则</h3>
+<ul>
+  <li><strong>英文</strong>：单词边界正则 <code>(?&lt;![A-Za-z0-9])term(?![A-Za-z0-9])</code>，避免子串误命中。</li>
+  <li><strong>中文</strong>：直接 substring 匹配。</li>
+  <li><code>case_sensitive</code>：公司/产品名建议开 <code>true</code> 避免误伤（如 <code>WEKA</code>、<code>CXL</code>）。</li>
+  <li><code>match_aliases_only</code>：只用别名匹配，<code>name</code> 仅作显示。用于 <code>Ray</code>、<code>Dynamo</code>、<code>MoE</code>、<code>Triton</code>、<code>checkpoint</code> 这类裸词误命中率极高的关键词 —— 例如 <code>MoE</code> 会撞 Ministry of Education，<code>Ray</code> 会撞 Ray-Ban。</li>
+  <li><strong>意见领袖源例外</strong>：<code>category=influencer</code> 的条目绕过关键词匹配（大神发言正文未必含存储词，但本身即精选），只剔除 RT/回复，用源名里的人名作为 matched_keyword。</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="quality">4 · 质量过滤</h2>
+
+<p>命中关键词后并不直接通过，还要过 <code>is_low_quality()</code> 这道闸，剔除社区闲聊/求助/营销/股评，避免污染候选池。判定维度：</p>
+
+<table>
+<tr><th>维度</th><th>规则</th><th>示例</th></tr>
+<tr><td>域名黑名单</td><td>内容农场 / 股评聚合站直接拦</td><td><code>simplywall.st</code>、<code>fool.com</code>、<code>seekingalpha.com</code>、<code>benzinga.com</code>、<code>zacks.com</code> 等</td></tr>
+<tr><td>股价/估值模板标题</td><td>命中模板词即拦（即使域名不在黑名单）</td><td>"price target"、"should you buy"、"stock surges"、"估值分析"、"目标价"</td></tr>
+<tr><td>社区疑问句</td><td>来自社区源 + 标题以 <code>?</code> 结尾</td><td>Reddit/HN 上的个人提问</td></tr>
+<tr><td>闲聊/求助前缀</td><td>标题以特定前缀开头</td><td>"Ask HN"、"how to"、"why is"、"anyone else"、"请问"、"求助"、"求推荐"</td></tr>
+<tr><td>营销腔</td><td>个人/标题党片段</td><td>"I built"、"you won't believe"、"must read"</td></tr>
+<tr><td>过短无信息</td><td>社区源 + 标题 &lt;12 字符且全英文</td><td>Reddit 上 1-2 词的帖</td></tr>
+</table>
+
+<div class="warnbox">
+域名黑名单会被检查<strong>两次</strong>：normalize 阶段一次；以及 LLM 选完、Google News URL 解码出真实域名后<strong>再过一次</strong>（<code>is_blacklisted_url</code>）—— 因为 Google News 链接在解码前看不到背后的真实站点。
+</div>
+
+<!-- ============================================================ -->
+<h2 id="themegate">5 · 语义主题门（内容召回）</h2>
+
+<p>纯字符串精确匹配有召回缺口：下一个 Reasonix 类 KV cache 方案、Lakebase 类向量库，若标题里不带已知关键词就会被丢。<code>core/theme_gate.py</code> 解决这个问题 —— 从<strong>内容</strong>出发识别主题，而非枚举每个产品名。</p>
+
+<h3>5.1 成本控制三道闸</h3>
+<ol>
+  <li><strong>只对具名媒体源跑</strong>：仅 <code>source_tier &ge; 1.0</code>（具名 RSS / 一手博客 / 中文 AI 媒体）的未命中条目才进，Google News / Tavily / GitHub Trending / 意见领袖被排除。</li>
+  <li><strong>本地词表粗筛</strong>：先用所有主题 <code>vocab</code> 的并集做小写子串匹配，命中的才送 LLM（一次合并调用）。</li>
+  <li><strong>上限截断</strong>：单次最多 80 条，超出按「源质量 + 新近度」排序取前 N，其余明确告知本轮跳过、不静默丢。</li>
+</ol>
+
+<h3>5.2 判定与产出</h3>
+<p>LLM 对每条判断「是否<strong>确实在讲</strong>某个关注主题」（只是顺带提一句不算），从严判定，拿不准填 <code>none</code>。命中则：</p>
+<ul>
+  <li>以该主题对应的既有 <code>keyword</code> 重新纳入候选池（正常进入后续分类/排序）；</li>
+  <li>抽取「让它相关的最核心实体名」（如某新产品名）。</li>
+</ul>
+
+<div class="note">
+<strong>关键词自动沉淀</strong>：召回时把核心实体名计数落盘到 <code>reports/theme_finds.json</code>。某新名字累计出现 &ge; 3 次且仍不在 <code>keywords.yaml</code> 里，就打印「建议固化为关键词」—— 让长期反复出现的新名字从「每次花 LLM 的语义门」沉淀为「零成本精确匹配的关键词」。
+</div>
+
+<!-- ============================================================ -->
+<h2 id="score">6 · 客观打分</h2>
+
+<p><code>compute_score()</code> 聚合所有源能给出的客观信号，值域大致 0~2.0。这个分数用于<strong>进入 LLM 前的预排序</strong>（不直接决定最终入选）。</p>
+
+<pre>score =  0.25·log10(points+1) + 0.08·log10(comments+1)   # HN 绝对热度*
+       + 0.25·log10(delta_24h+1)                          # 24h 热度增量*
+       + 0.20·log2(cross_source_count+1)                  # 多源同时报道（最强 cross-check）
+       + 0.15·tavily_score                                # Tavily 自带相关性分 (0~1)
+       + 0.07·recency_boost                               # 越新越靠前
+       + 0.30·source_tier                                 # 源质量分级</pre>
+<p class="small mut">* HN 已禁用，points/comments/delta 多数为 0；当前主力信号是 cross_source_count、source_tier、recency。</p>
+
+<h3>6.1 各项说明</h3>
+<table>
+<tr><th>项</th><th>含义 / 取值</th></tr>
+<tr><td><code>log</code> 压缩</td><td>把 HN points、cross_source 这类离散数量压到可比尺度；<code>cross</code> 用 log2（增长快），被 5 家媒体覆盖的事件权重接近 HN 1000 分。</td></tr>
+<tr><td><code>source_tier</code></td><td>源质量分级 0~1：<span class="tag g">具名 RSS = 1.0</span>（官方/垂直/中文 AI 媒体）<span class="arrow">&gt;</span><span class="tag w">GitHub Trending = 0.6</span><span class="arrow">&gt;</span><span class="tag p">Google News / Tavily = 0.3</span>。搜索兜底是内容农场/标题党/近重复的主来源，整体降权。</td></tr>
+<tr><td><code>recency_boost</code></td><td>0~1，在采集周期内距今越近越接近 1。按<strong>采集周期</strong>归一化（周报等 &gt;24h 窗口里靠后的天也能拿到新近度信号）。</td></tr>
+<tr><td><code>cross_source_count</code></td><td>同事件被多少家<strong>不同媒体</strong>报道（见第 7 节）。</td></tr>
+<tr><td><code>tavily_score</code></td><td>Tavily 自带的 0~1 相关性分，作为 Tavily-only 条目的兜底信号，避免其客观分恒为 0。</td></tr>
+</table>
+
+<div class="note">
+源分级是后期引入的关键修正：HN 禁用后客观分几乎全平，候选池失去有效预排序、全靠 LLM 在噪声里硬挑。
+加 <code>source_tier</code> 后把「可信一手/媒体源」和「搜索兜底」拉开档次。
+</div>
+
+<!-- ============================================================ -->
+<h2 id="collapse">7 · 跨源聚合与事件折叠</h2>
+
+<h3>7.1 同事件聚类</h3>
+<p>Google News 标题形如 <code>"Headline - Outlet"</code>，同一事件的多个转载后缀不同。系统用<strong>剥离媒体名后缀 + 归一化的标题</strong>作聚合 key（<code>_event_key</code>：去 "- 媒体名" → 小写 → 去标点 → 折叠空白），让同一事件的多个版本真正归并。</p>
+
+<h3>7.2 两个产出</h3>
+<ul>
+  <li><code>compute_cross_source_count()</code>：给每条写入 <code>cross_source_count</code>（被几家媒体报道）和 <code>cross_sources</code>（媒体名列表，用于报告里「📎 来源：A / B / C」多源标注）。</li>
+  <li><code>collapse_events()</code>：同一事件的多个转载只留一条代表，去除候选池里的近重复、避免稀释 LLM 判断。代表条选取优先级：<strong>中文来源 &gt; 源质量 &gt; 客观分</strong>，并自带完整媒体名单。</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="llm">8 · LLM 分类排序</h2>
+
+<p>候选池进入 <code>core/ranker.py</code> 的 <code>rank_by_category()</code>，<strong>按 7 个分类各自独立做 LLM 排序</strong>。</p>
+
+<h3>8.1 七个分类（用户视角）</h3>
+<div class="grid">
+  <div class="card"><h4>存储/基建产品</h4><p class="small">存储厂商/SSD/互联协议/GPU 数据通路 的产品级动态</p></div>
+  <div class="card"><h4>模型/框架/算法</h4><p class="small">大模型 release / 训练推理框架 / 推理优化算法</p></div>
+  <div class="card"><h4>基准评测</h4><p class="small">MLPerf / IO500 / SPECstorage 等评测结果（选型硬通货）</p></div>
+  <div class="card"><h4>学术论文</h4><p class="small">arXiv / 顶会 / 期刊原始论文</p></div>
+  <div class="card"><h4>政策导向</h4><p class="small">出口管制 / 监管 / 法规 / 行业标准联盟</p></div>
+  <div class="card"><h4>github趋势</h4><p class="small">github.com 的项目动态</p></div>
+  <div class="card"><h4>AI意见领袖</h4><p class="small">Twitter/X 大神一手发言（单独 rubric）</p></div>
+</div>
+
+<h3>8.2 启发式硬分桶（heuristic_category）</h3>
+<p>每条候选先被规则硬分到某一桶，优先级从高到低（前者命中即归类）：</p>
+<ol>
+  <li>意见领袖源 → <strong>AI意见领袖</strong></li>
+  <li>命中基准关键词 / 标题摘要含 MLPerf·IO500·SPECstorage → <strong>基准评测</strong></li>
+  <li>arXiv / 论文域名（openreview、usenix、VLDB…）→ <strong>学术论文</strong></li>
+  <li>github.com 域名 / GitHub Trending 源 → <strong>github趋势</strong></li>
+  <li>含政策信号词（export control、出口管制、网信办…）或 <code>.gov</code> 域名 → <strong>政策导向</strong>（早于官方源判断，防止「工信部发布…」被误判为公司新闻）</li>
+  <li>命中关键词所属类别（存储集合 vs 模型集合，存储优先）</li>
+  <li>官方源按源名启发式（vLLM/HF/OpenAI… → 模型；其余 → 存储）</li>
+  <li>兜底 → 存储/基建产品</li>
+</ol>
+
+<h3>8.3 候选池排序 + token 自适应粗筛</h3>
+<p>每个桶单独处理：</p>
+<ol>
+  <li><strong>排序键</strong>（降序）：<code>watchlisted</code> <span class="arrow">›</span> 严格官方源（仅厂商 official_domains）<span class="arrow">›</span> 任意官方源（含 github/arxiv）<span class="arrow">›</span> 客观分。</li>
+  <li><strong>质量头 + 多样性尾</strong>：取 <code>max_pool</code>（默认 55，学术论文 80）条进 LLM。前半按上面排序取最强条目（保质量），后半按<strong>关键词轮转</strong>（round-robin）补主题覆盖 —— 避免某个高产官方源（一天十几篇 NVIDIA 博客）刷屏，把只来自单源的真新闻（华为 Tao 定律、KV file system）挤出候选池。</li>
+  <li><strong>token 预算二分粗筛</strong>：估算 prompt token，若超预算（默认 20000）：先尝试压缩摘要（compact）；仍超则二分搜索保留条数，用「官方一手保底 ~1/4 + 关键词轮转」策略压到预算内，并打印丢了多少。</li>
+</ol>
+
+<h3>8.4 LLM 终选 prompt</h3>
+<p>每个桶用一段 prompt 调一次 LLM（JSON 输出），核心包含：</p>
+<ul>
+  <li><strong>身份 rubric</strong>：7 个信息价值维度（存储/AI 基建相关性、性能数字、经济数字、跨厂商对标、首发性、决策影响范围、可操作性、时效性），明确「带增量 vs 不带增量」的取舍清单。</li>
+  <li><strong>分类定义</strong>：每个桶有专属 <code>category_def</code> 圈定范围。</li>
+  <li><strong>挑选规则</strong>：宁缺毋滥；【重点关注】条目只要有实质进展就优先纳入；官方源默认保留；同事件多版本只留官方版。</li>
+  <li><strong>产出</strong>：每条给 <code>display_title</code>（≤30 字中文新闻式短标题）+ <code>summary</code>（250-500 字中文摘要，强制「忠实性 &gt; 数字密度 &gt; 字数」，禁止编造数字/填充句/评价词/推测词）。</li>
+  <li>意见领袖桶用<strong>单独 prompt</strong>：评判「观点影响力/信息量」，不要求存储相关、不强制数字结构。</li>
+</ul>
+
+<div class="note">
+<strong>Prompt 热更新</strong>：rubric 与分类定义可被 <code>config/prompt_override.yaml</code> 逐字段覆盖（界面可改），每次运行重读，无需重启。
+</div>
+
+<h3>8.5 重点关注保底</h3>
+<p>被 watchlist 命中的最佳在窗新闻，若 LLM 因「宁缺毋滥」漏选，会被<strong>强制补回</strong>各自分类（每个词补 1 条最高分），再单独调一次 LLM 给它补中文标题 + 摘要。保证「只要当周有该跟踪项的新闻就一定展示」。</p>
+
+<!-- ============================================================ -->
+<h2 id="summary">9 · 摘要 / 自检 / 翻译 / 标题核查</h2>
+
+<p>LLM 选完后，对选中条目做一系列后处理（均在 <code>main.py run_once</code> 中串联）：</p>
+
+<div class="flow">
+  <div class="step"><div class="t">摘要策略选择</div><div class="d">原 RSS 摘要可用（<code>clean_rss_summary</code> 通过：非元数据/占位符、≥60 字、非促销噪声）→ 直接用原文（<code>summary_source=rss</code>）；不可用 → 用 LLM 生成的摘要（<code>summary_source=llm</code>）。<strong>意见领袖发言例外</strong>：始终用 LLM 中文转述（含「为何值得知道」），不回退英文原推。</div></div>
+  <div class="step"><div class="t">Google News URL 解码</div><div class="d"><code>decode_items_inplace</code>：把 base64 加密的中转链接还原成真实文章 URL（只对最终选中条目调用，省请求）。</div></div>
+  <div class="step"><div class="t">解码后二次黑名单过滤</div><div class="d">解码暴露真实域名后，再过一遍域名黑名单，丢掉命中的 picks。</div></div>
+  <div class="step"><div class="t">分类内标题去重</div><div class="d">同分类里标题近重复的，只保留客观分最高的一条。</div></div>
+  <div class="step"><div class="t">摘要二次自检（verify_all）</div><div class="d">仅对 LLM 生成的摘要：核查是否含原文未提及的推测词（可能/或将/有望）、评论词（重大意义/标志着）、编造的细节/数字；有问题则严格基于原文重写。</div></div>
+  <div class="step"><div class="t">翻译（translate_all）</div><div class="d">RSS 原文摘要非中文 → 全量翻译；LLM 摘要残留韩/日/阿拉伯等非英非中文字 → 翻译清洗。保留专有名词/数字原样。</div></div>
+  <div class="step"><div class="t">标题反幻觉核查（verify_titles）</div><div class="d">检查 <code>display_title</code> 里的<strong>数字</strong>和<strong>公司/产品主体</strong>是否能在原标题或原 RSS 摘要中找到（关键：校验只基于原文，不含 LLM 自己生成的 summary，避免自我印证幻觉）。查不到 → LLM 重写或回退翻译后的原标题。</div></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="digest">10 · 综合层（今日概览）</h2>
+
+<p><code>core/digest.py</code> 在所有选中条目上做<strong>跨条目综合</strong>，一次合并 LLM 调用，生成：</p>
+<ul>
+  <li><strong>今日概览（overview）</strong>：3-5 句把当天信号串成一个判断，必须引用真实出现的事件，禁止编造。</li>
+  <li><strong>趋势分析（trends）</strong> + <strong>规划建议（advice）</strong>：可选，由 <code>digest_analysis</code> 开关控制。<span class="mut">当前默认<strong>关闭</strong> —— 仅凭局部信息难给出高价值建议，只保留「今日概览」，待信息面扩展后再开。</span></li>
+</ul>
+<p class="small mut">读者定位与排序层一致（资深 AI 存储技术规划分析师），趋势/建议都落在选型、采购、容量/带宽规划、架构演进、TCO 决策层面。失败时优雅降级为空，报告照常出。</p>
+
+<!-- ============================================================ -->
+<h2 id="output">11 · 报告输出与推送</h2>
+<ul>
+  <li><strong>HTML 日报</strong>：<code>reporter/render.py</code> 用 Jinja2 模板（<code>templates/daily.html</code>）按 7 个分类渲染，含今日概览、每条的中文标题/摘要/来源/多源标注/发布时间/原文链接。落盘到 <code>reports/YYYY-MM-DD-HHMM.html</code>。</li>
+  <li><strong>推送</strong>：<code>reporter/notify.py</code> 按 <code>config/notify.yaml</code> 推送（企业微信等渠道）。</li>
+  <li><strong>控制台输出</strong>：分类打印选中条目，含官方/分类徽标、摘要来源标签（rss/llm + 自检/翻译标记）。</li>
+  <li><strong>Token 用量报告</strong>：按调用类型分桶统计 LLM 输入/输出 token。</li>
+  <li><strong>调试模式</strong>（<code>--debug</code>）：<code>core/debug_trace.py</code> 记录每一步筛选前后内容与丢弃原因，落盘为可读 HTML + 完整 JSON 到 <code>reports/debug/</code>。</li>
+</ul>
+
+<h3>11.1 历史存储（SQLite）</h3>
+<p><code>history.sqlite</code> 存三张表：<code>items</code>（元数据 + 首次见到时间）、<code>signal_history</code>（每次抓取的信号快照）、<code>meta</code>（如 <code>last_run_at</code>）。
+<code>delta_24h</code> = 当前 points − 24h 前最近一次快照的 points；24h 内首见则 delta=0（靠 recency 兜底）。</p>
+
+<h3>11.2 运行方式</h3>
+<pre>python main.py                       # 单次跑，过去 24h 窗口
+python main.py --window-hours 24     # 强制固定 24h 窗口
+python main.py --keywords NVIDIA,vLLM  # CLI 临时覆盖关键词
+python main.py --no-llm --top 30     # 跳过 LLM，按客观分出列表
+python main.py --debug               # 记录每步筛选前后内容
+python main.py --daemon --at 09:00   # 每天 09:00 定时跑</pre>
+
+<!-- ============================================================ -->
+<h2 id="pipeline">12 · 完整流程图</h2>
+
+<div class="pipechain">
+<span class="b">sources.yaml / keywords.yaml / themes.yaml</span>
+<br><span class="arrow">▼</span> 展开任务<br>
+<span class="b">并发抓取</span> RSS + Google News搜索 + Tavily（httpx：UA/超时/重试/每主机限流）
+<br><span class="arrow">▼</span> 统一 schema<br>
+<span class="b">去重</span> <span class="arrow">→</span> <span class="b">时间窗</span>（无日期即丢） <span class="arrow">→</span> <span class="b">关键词匹配</span>
+<br><span class="arrow">▼</span><br>
+命中 <span class="arrow">→</span> <span class="b">质量过滤</span>（黑名单/股评/闲聊/营销）&nbsp;&nbsp;|&nbsp;&nbsp;未命中+媒体源 <span class="arrow">→</span> <span class="b">语义主题门</span>（vocab粗筛→LLM召回）
+<br><span class="arrow">▼</span><br>
+<span class="b">delta 计算</span>（SQLite历史）<span class="arrow">→</span> <span class="b">跨源聚合</span>（cross_source_count）<span class="arrow">→</span> <span class="b">事件折叠</span>（去近重复）
+<br><span class="arrow">▼</span><br>
+<span class="b">watchlist 标记</span> <span class="arrow">→</span> <span class="b">客观打分</span>（热度+多源+源质量+新近度）
+<br><span class="arrow">▼</span> 候选池<br>
+<span class="b">启发式硬分桶</span>（7 类）<span class="arrow">→</span> <span class="b">质量头+多样性尾排序</span> <span class="arrow">→</span> <span class="b">token 二分粗筛</span>
+<br><span class="arrow">▼</span> 每桶一次<br>
+<span class="b">LLM 终选</span>（身份 rubric · 宁缺毋滥 · 出 display_title + summary）<span class="arrow">→</span> <span class="b">watchlist 保底补回</span>
+<br><span class="arrow">▼</span><br>
+<span class="b">摘要策略</span>（RSS优先/LLM兜底）<span class="arrow">→</span> <span class="b">URL解码</span> <span class="arrow">→</span> <span class="b">二次黑名单</span> <span class="arrow">→</span> <span class="b">标题去重</span>
+<br><span class="arrow">▼</span><br>
+<span class="b">摘要自检</span> <span class="arrow">→</span> <span class="b">翻译</span> <span class="arrow">→</span> <span class="b">标题反幻觉核查</span> <span class="arrow">→</span> <span class="b">综合层</span>（今日概览）
+<br><span class="arrow">▼</span><br>
+<span class="b">HTML 日报</span>（reports/）<span class="arrow">+</span> <span class="b">推送</span>（企业微信等）<span class="arrow">+</span> <span class="b">Token 用量报告</span>
+</div>
+
+<hr>
+<p class="small mut">文档基于当前代码实现整理 · LLM：MiniMax-M2.7 · 读者定位：资深 AI 存储技术规划与分析师</p>
+
+</div>
+</body>
+</html>

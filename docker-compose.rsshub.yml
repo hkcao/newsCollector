@@ -1,0 +1,20 @@
+# 自建 RSSHub —— 给微信公众号等「无原生 RSS」的源做中继。
+#
+# 用法：
+#   docker compose -f docker-compose.rsshub.yml up -d
+#   export RSSHUB_BASE=http://localhost:1200
+#   # 再在 config/sources.yaml 的「微信公众号源」里填好路由 / feedId 并 enabled: true
+#
+# 注意：RSSHub 的微信公众号路由通常需要该号的 biz id（从一篇公众号文章链接里取）。
+# 若只为采集公众号、想更省心，建议改用 wechat2rss（github.com/ttttmr/wechat2rss），
+# 它专做公众号、后台加号即得 feedId；RSSHUB_BASE 指向它、url 用 "{base}/feed/<feedId>.xml"。
+services:
+  rsshub:
+    image: diygod/rsshub:latest
+    restart: unless-stopped
+    ports:
+      - "1200:1200"
+    environment:
+      NODE_ENV: production
+      CACHE_TYPE: memory
+      CACHE_EXPIRE: "3600"

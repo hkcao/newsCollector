@@ -7,6 +7,7 @@
   python main.py --no-llm                     # 跳过 LLM，按客观分数出列表
   python main.py --all                        # 不限时间窗
   python main.py --top 30                     # --no-llm 时显示条数上限
+  python main.py --window-hours 24 --debug    # 记录每一步筛选前后内容到 reports/debug/
 
 定时模式（前台守护进程）:
   python main.py --daemon --at 09:00          # 每天 09:00 跑一次
@@ -42,6 +43,8 @@ from core.ranker import (
     verify_all,
     verify_titles,
 )
+from core.digest import build_digest
+from core.debug_trace import TRACE
 from core.secrets import load_secrets
 from core.summary import clean_rss_summary
 
@@ -158,6 +161,8 @@ def flatten_to_render(grouped_raw: dict[str, list[dict]]) -> dict[str, list[dict
                 "verified": p.get("verified", False),
                 "translated": p.get("translated", False),
                 "llm_category": p.get("llm_category", ""),
+                "cross_sources": (p.get("signals", {}) or {}).get("cross_sources")
+                                 or ([p["source"]] if p.get("source") else []),
             }
             for p in picks
         ]
@@ -168,8 +173,14 @@ def flatten_to_render(grouped_raw: dict[str, list[dict]]) -> dict[str, list[dict
 
 def run_once(args) -> int:
     """跑一次完整流程，返回命中条数。"""
+    if getattr(args, "debug", False):
+        TRACE.enable(REPORTS_DIR / "debug")
+        print("  [DEBUG] 调试模式：记录每一步筛选前后内容，结束后落盘到 reports/debug/")
+
     sources = load_yaml(ROOT / "config" / "sources.yaml")["sources"]
-    config_keywords = load_yaml(ROOT / "config" / "keywords.yaml")["keywords"]
+    _kw_data = load_yaml(ROOT / "config" / "keywords.yaml")
+    config_keywords = _kw_data["keywords"]
+    watchlist = _kw_data.get("watchlist") or []
     if args.keywords:
         keywords = parse_cli_keywords(args.keywords, config_keywords)
         merged = [k["name"] for k in keywords if k.get("official_domains")]
@@ -192,21 +203,28 @@ def run_once(args) -> int:
             f"({hours:.1f}h, 本地时区)"
         )
 
+    # 语义主题门用：未命中关键词但来自媒体源的条目按内容召回（仅在用 LLM 时启用）
+    themes = load_yaml(ROOT / "config" / "themes.yaml").get("themes", []) if (ROOT / "config" / "themes.yaml").exists() else []
+    llm_cfg = None
+    if not args.no_llm:
+        reset_usage()  # 置于 normalize 之前，让主题门的 LLM 调用一并计入用量
+        llm_cfg = load_llm_config(ROOT / "config" / "llm.yaml")
+
     print(f"\n[1/5] 抓取 {len(sources)} 个源...")
     raw = list(fetch_all(sources, keywords))
     print(f"  共抓到 {len(raw)} 条原始数据")
+    TRACE.snapshot("fetch.raw", raw, note="各源抓取的原始条目（去重/时窗/匹配前）")
 
-    print(f"\n[2/5] 去重 + 关键词匹配 + 客观打分（SQLite delta）...")
-    items = normalize(raw, keywords, db=db, since=since)
-    print(f"  命中关键词且在时窗内: {len(items)} 条")
+    print(f"\n[2/5] 去重 + 关键词匹配 + 语义主题门 + 客观打分（SQLite delta）...")
+    items = normalize(raw, keywords, db=db, since=since, themes=themes,
+                      llm_cfg=llm_cfg, watchlist=watchlist)
+    print(f"  命中关键词/主题且在时窗内: {len(items)} 条")
 
     if args.no_llm:
         print("\n[3/5] 跳过 LLM 排序 (--no-llm)")
         print_no_llm(items, args.top)
     else:
-        reset_usage()
         print(f"\n[3/5] LLM 按重要性筛选 (top_k 每关键词)...")
-        llm_cfg = load_llm_config(ROOT / "config" / "llm.yaml")
         print(f"  模型: {llm_cfg['model']}  base_url: {llm_cfg.get('base_url') or 'OpenAI default'}")
         grouped_raw = rank_all(items, keywords, llm_cfg)
 
@@ -216,7 +234,8 @@ def run_once(args) -> int:
             for p in picks:
                 p["raw_rss_summary"] = p.get("summary", "")  # 保留原始供自检参考
                 rss = clean_rss_summary(p["raw_rss_summary"])
-                if rss:
+                # 意见领袖发言用 LLM 中文转述（含"为何值得知道"），不回退原始英文推文
+                if rss and p.get("llm_category") != "AI意见领袖":
                     p["summary"] = rss
                     p["summary_source"] = "rss"
                     rss_used += 1
@@ -226,31 +245,40 @@ def run_once(args) -> int:
                     llm_used += 1
             decode_items_inplace(picks)
         print(f"  [摘要] {rss_used} 条来自原 RSS，{llm_used} 条 LLM 生成")
+        TRACE.note("summary.strategy", f"摘要来源：RSS {rss_used} 条 / LLM 生成 {llm_used} 条")
 
         # 解码后二次过滤：Google News 此时才暴露真实域名，再过一遍黑名单
         from core.normalizer import is_blacklisted_url
         dropped_after_decode = 0
+        _dbg_bl: list[tuple] = []
         for cat, picks in list(grouped_raw.items()):
             kept = []
             for p in picks:
                 if is_blacklisted_url(p.get("url", "")):
                     dropped_after_decode += 1
+                    if TRACE.enabled:
+                        _dbg_bl.append((p, "解码后命中域名黑名单"))
                 else:
                     kept.append(p)
             grouped_raw[cat] = kept
         if dropped_after_decode:
             print(f"  [二次过滤] 解码后丢弃 {dropped_after_decode} 条命中黑名单域名的 picks")
+        TRACE.drops("post_decode.blacklist", _dbg_bl)
         # 去重：同一分类内若有 cross_source_count 大且标题相似的，仅保留客观分最高的
+        _dbg_dup: list[tuple] = []
         for cat, picks in list(grouped_raw.items()):
             seen_titles = set()
             kept = []
             for p in sorted(picks, key=lambda x: -float(x.get("score", 0) or 0)):
                 key = "".join(c for c in (p.get("display_title") or p.get("title") or "")[:20].lower() if c.isalnum() or "一" <= c <= "鿿")
                 if key and key in seen_titles:
+                    if TRACE.enabled:
+                        _dbg_dup.append((p, "分类内标题近重复"))
                     continue
                 seen_titles.add(key)
                 kept.append(p)
             grouped_raw[cat] = kept
+        TRACE.drops("post_rank.title_dedupe", _dbg_dup)
 
         # 二次自检：仅对 LLM 生成的摘要核查推测/扩写
         if llm_used:
@@ -264,6 +292,14 @@ def run_once(args) -> int:
         print("  [标题核查] 检查所有 picks 的 display_title…")
         verify_titles(grouped_raw, llm_cfg, keywords=keywords)
 
+        # 综合层：在 grouped_raw（带 signals/cross_sources）上做跨条目综合
+        print("  [综合层] 生成 今日概览 / 趋势 / 建议…")
+        digest = build_digest(grouped_raw, llm_cfg)
+        TRACE.note("digest", "综合层输出（今日概览/趋势/建议）", data=digest)
+        TRACE.snapshot("final.picks",
+                       [p for picks in grouped_raw.values() for p in picks],
+                       note="最终展示条目（摘要/翻译/标题核查后）")
+
         grouped = flatten_to_render(grouped_raw)
 
         print("\n[4/5] 控制台输出")
@@ -272,13 +308,13 @@ def run_once(args) -> int:
         print("\n[5/5] 生成 HTML 报告 + 推送通知")
         win_from = fmt_local(since) if since else "all"
         win_to = fmt_local(now)
-        html = render_html(grouped, win_from, win_to)
+        html = render_html(grouped, win_from, win_to, digest)
         out = write_report(html, REPORTS_DIR)
         print(f"  [HTML] 已保存: {out}")
 
         notify_cfg = load_notify_config(ROOT / "config" / "notify.yaml")
         date_str = now.strftime("%Y-%m-%d")
-        notify_all(grouped, html, date_str, notify_cfg)
+        notify_all(grouped, html, date_str, notify_cfg, digest)
 
         print("\n" + USAGE.report())
 
@@ -286,6 +322,12 @@ def run_once(args) -> int:
     if not args.all and args.window_hours is None:
         db.set_meta(LAST_RUN_KEY, now.isoformat())
     db.close()
+
+    if TRACE.enabled:
+        html_path = TRACE.dump()
+        print(f"\n  [DEBUG] 调试追踪已保存（可读 HTML + 完整 JSON）:\n"
+              f"    open {html_path}\n    {html_path.with_suffix('.json')}")
+
     return len(items)
 
 
@@ -325,6 +367,8 @@ def main():
     ap.add_argument("--at", default="09:00", help="--daemon 模式下每日触发时间 HH:MM (24h)")
     ap.add_argument("--run-now", action="store_true",
                     help="--daemon 模式下启动时先跑一次")
+    ap.add_argument("--debug", action="store_true",
+                    help="调试模式：记录每一步筛选前后内容到 reports/debug/（HTML + JSON）")
     args = ap.parse_args()
 
     if args.daemon:

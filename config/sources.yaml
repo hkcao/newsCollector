@@ -357,6 +357,68 @@ sources:
     url: https://www.aiera.com.cn/feed
     category: tech-zh
 
+  # 雷峰网：AI 芯片 / 智能硬件 / AI 基础设施报道密集，对存储/算力规划信号好（feed 已验证可用）
+  - name: 雷峰网
+    type: rss
+    url: https://www.leiphone.com/feed
+    category: tech-zh
+
+  # ===== 微信公众号源（需自建中继；未配置时整批静默跳过）=====
+  # 这些号只在微信公众号发、却对 AI 存储/基建战略很有价值，但公众号没有官方 RSS。
+  # 要采集它们，需自建一个中继服务并用环境变量 RSSHUB_BASE 指向它：
+  #   方案一（推荐，专做公众号）：自建 wechat2rss（github.com/ttttmr/wechat2rss）——
+  #       后台添加公众号 → 得到 feedId → 下面 url 写成 "{base}/feed/<feedId>.xml"。
+  #   方案二：自建 RSSHub（见仓库根 docker-compose.rsshub.yml），用对应 RSSHub 路由。
+  # 然后 `export RSSHUB_BASE=http://localhost:1200`（或你的实例地址）。
+  # URL 里的 {base} 会被自动替换；未设 RSSHUB_BASE 时这些源被整批跳过、不影响其它源。
+  # 填好 feedId/路由、确认可用后，把对应条目的 enabled 改成 true。
+  - name: 海外独角兽
+    type: rss
+    url: "{base}/feed/<feedId>.xml"   # 拾象·海外独角兽：海外 AI infra / 商业化一手研究
+    category: tech-zh
+    enabled: false
+  - name: 甲子光年
+    type: rss
+    url: "{base}/feed/<feedId>.xml"   # AI 产业 / 基础设施深度
+    category: tech-zh
+    enabled: false
+  - name: 智能涌现
+    type: rss
+    url: "{base}/feed/<feedId>.xml"   # 36氪·AI 商业化与基建
+    category: tech-zh
+    enabled: false
+
+  # ===== AI 意见领袖（Twitter/X 一手发言） =====
+  # 经 nitter.net 转 RSS（直连 X 已无免费 RSS）。category=influencer 的源会：
+  #   1) 绕过关键词匹配（大神发言正文未必含存储关键词，但本身就是精选）
+  #   2) 硬分类到「AI意见领袖」桶，用单独 rubric 评"观点影响力/信息量"，不要求存储相关
+  #   3) normalizer 会过滤掉 RT/回复，仅保留原创发言
+  # nitter 公共实例偶有不稳，失败会自动跳过、不影响其它源。
+  - name: X · Karpathy
+    type: rss
+    url: https://nitter.net/karpathy/rss
+    category: influencer
+  - name: X · Andrew Ng
+    type: rss
+    url: https://nitter.net/AndrewYNg/rss
+    category: influencer
+  - name: X · Tri Dao
+    type: rss
+    url: https://nitter.net/tri_dao/rss
+    category: influencer
+  - name: X · Jim Fan
+    type: rss
+    url: https://nitter.net/DrJimFan/rss
+    category: influencer
+  - name: X · Soumith Chintala
+    type: rss
+    url: https://nitter.net/soumithchintala/rss
+    category: influencer
+  - name: X · Sam Altman
+    type: rss
+    url: https://nitter.net/sama/rss
+    category: influencer
+
   # ===== 关键词搜索源 =====
   - name: Google News
     type: keyword_search
@@ -375,6 +437,6 @@ sources:
     type: tavily
     api_key_env: TAVILY_API_KEY
     category: news
-    days: 2          # 查询近 N 天，pipeline 会用 since 再过滤一次
+    days: 7          # 查询近 N 天（覆盖到周级窗口）；pipeline 会用 since 再过滤一次
     max_results: 10  # 每个关键词最多返回多少条
     topic: news      # news | general

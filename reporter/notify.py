@@ -140,11 +140,17 @@ def send_feishu(grouped: dict[str, list[dict]], date: str, cfg: dict) -> bool:
 _WECOM_MD_LIMIT = 3800
 
 
-def _wecom_markdown_chunks(grouped: dict[str, list[dict]], date: str) -> list[str]:
+def _wecom_markdown_chunks(
+    grouped: dict[str, list[dict]], date: str, digest: dict | None = None
+) -> list[str]:
     """把每日资讯渲染成多块 markdown，单块不超过 _WECOM_MD_LIMIT 字节。
-    按"分类 → 条目"切分；同一条目不拆分。"""
+    按"分类 → 条目"切分；同一条目不拆分。digest 提供则加 概览/趋势/建议 三段。"""
+    digest = digest or {}
     chunks: list[str] = []
     cur = f"## 📰 每日 AI 存储技术资讯 · {date}\n"
+    overview = (digest.get("overview") or "").strip()
+    if overview:
+        cur += f"\n**📊 今日概览**\n{overview}\n"
 
     def flush():
         nonlocal cur
@@ -162,13 +168,15 @@ def _wecom_markdown_chunks(grouped: dict[str, list[dict]], date: str) -> list[st
                 summary = (p.get("summary") or "").strip()
                 if len(summary) > 280:
                     summary = summary[:280].rstrip() + "…"
-                source = p.get("source", "")
+                sig = p.get("signals", {}) or {}
+                srcs = p.get("cross_sources") or sig.get("cross_sources") or []
+                src_line = " / ".join(srcs) if len(srcs) > 1 else p.get("source", "")
                 ts = fmt_local(p.get("published"))
                 url = p.get("url", "")
                 official = "  `[官方]`" if p.get("is_official") else ""
                 item_md = (
                     f"\n[**{title}**]({url}){official}\n"
-                    f"<font color=\"comment\">{source} · {ts}</font>\n"
+                    f"<font color=\"comment\">📎 {src_line} · {ts}</font>\n"
                     f"{summary}\n"
                 )
                 # 单条本身超长就硬截断
@@ -185,6 +193,23 @@ def _wecom_markdown_chunks(grouped: dict[str, list[dict]], date: str) -> list[st
         if len((cur + block).encode("utf-8")) > _WECOM_MD_LIMIT:
             flush()
         cur += block
+
+    # 综合层：趋势 + 建议 作为收尾块
+    trends = digest.get("trends") or []
+    advice = digest.get("advice") or []
+    if trends or advice:
+        tail = "\n"
+        if trends:
+            tail += "**📈 趋势分析**\n" + "".join(
+                f"{i}. {t}\n" for i, t in enumerate(trends, 1)
+            )
+        if advice:
+            tail += "\n**💡 给存储技术规划的建议**\n" + "".join(
+                f"{i}. {a}\n" for i, a in enumerate(advice, 1)
+            )
+        if len((cur + tail).encode("utf-8")) > _WECOM_MD_LIMIT:
+            flush()
+        cur += tail
     flush()
     return chunks
 
@@ -214,7 +239,9 @@ def _wecom_text_chunks(grouped: dict[str, list[dict]], date: str) -> list[str]:
     return chunks
 
 
-def send_wecom(grouped: dict[str, list[dict]], date: str, cfg: dict) -> bool:
+def send_wecom(
+    grouped: dict[str, list[dict]], date: str, cfg: dict, digest: dict | None = None
+) -> bool:
     if not cfg.get("enabled"):
         return False
     webhook = os.getenv("WECOM_WEBHOOK")
@@ -227,7 +254,7 @@ def send_wecom(grouped: dict[str, list[dict]], date: str, cfg: dict) -> bool:
     if mode == "text":
         chunks = _wecom_text_chunks(grouped, date)
     else:
-        chunks = _wecom_markdown_chunks(grouped, date)
+        chunks = _wecom_markdown_chunks(grouped, date, digest)
 
     if len(chunks) > max_chunks:
         print(f"  [wecom] 内容拆为 {len(chunks)} 块，超过 max_chunks={max_chunks}，截断尾部")
@@ -260,6 +287,7 @@ def notify_all(
     html: str,
     date: str,
     config: dict,
+    digest: dict | None = None,
 ) -> None:
     email_cfg = config.get("email", {}) or {}
     feishu_cfg = config.get("feishu", {}) or {}
@@ -271,4 +299,4 @@ def notify_all(
     if feishu_cfg.get("enabled"):
         send_feishu(grouped, date, feishu_cfg)
     if wecom_cfg.get("enabled"):
-        send_wecom(grouped, date, wecom_cfg)
+        send_wecom(grouped, date, wecom_cfg, digest)

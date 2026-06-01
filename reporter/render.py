@@ -16,6 +16,7 @@ _CATEGORY_ORDER = [
     "学术论文",
     "政策导向",
     "github趋势",
+    "AI意见领袖",
 ]
 
 
@@ -45,11 +46,14 @@ def render_html(
     grouped: dict[str, list[dict]],
     window_from: str,
     window_to: str,
+    digest: dict | None = None,
 ) -> str:
     """返回渲染后的 HTML 字符串。
 
     grouped: 按关键词分组的 dict；模板内按 llm_category 重新聚合呈现。
-    每条 item 需要含: title, url, source, published, summary, llm_category
+    每条 item 需要含: title, url, source, published, summary, llm_category；
+      可选 cross_sources（多源标注 📎 来源）。
+    digest: {"overview": str, "trends": [str], "advice": [str]}，综合分析三段；None 则不渲染。
     """
     tpl_dir = Path(__file__).parent / "templates"
     env = Environment(
@@ -60,11 +64,13 @@ def render_html(
     tpl = env.get_template("daily.html")
     total = sum(len(v) for v in grouped.values())
     by_category = _group_by_category(grouped)
+    digest = digest or {"overview": "", "trends": [], "advice": []}
     now = datetime.now()
     return tpl.render(
         grouped=grouped,
         by_category=by_category,
         total=total,
+        digest=digest,
         window_from=window_from,
         window_to=window_to,
         date=now.strftime("%Y-%m-%d"),

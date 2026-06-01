@@ -56,6 +56,7 @@ macOS 上如未安装 Python：`brew install python@3.12`。
 |---|---|
 | `config/keywords.yaml` | 关键词 + 同义词 + 官方域名 |
 | `config/sources.yaml` | RSS 源列表 |
+| `config/themes.yaml` | 语义主题（KV cache / 向量库 / 并行文件系统…），给「主题门」按内容召回用 |
 | `config/llm.yaml` | LLM 服务商 / 模型 / API Key（本地，已 gitignore） |
 | `config/notify.yaml` | 邮件 / 飞书 推送配置 |
 | `config/secrets.yaml` | 持久化密钥：`TAVILY_API_KEY` 等（本地，已 gitignore） |
@@ -63,7 +64,27 @@ macOS 上如未安装 Python：`brew install python@3.12`。
 环境变量（优先级 > secrets.yaml）：
 - `LLM_API_KEY` — 代替 `config/llm.yaml` 里的 api_key
 - `TAVILY_API_KEY` — 启用 Tavily Search 源（不设则跳过；免费档 https://tavily.com 注册即得，约 1000 次/月）
+- `RSSHUB_BASE` — 微信公众号源的中继基址（不设则相关源整批跳过，见下）
 - `EMAIL_PASSWORD` / `FEISHU_WEBHOOK` / `WECOM_WEBHOOK` — 推送通道
+
+### 微信公众号源（机器之心 / 海外独角兽 / 甲子光年 等）
+
+很多高价值的 AI 内容只在微信公众号发，而公众号没有官方 RSS。本项目通过一个**外部中继**把
+公众号转成 RSS 再采集——`config/sources.yaml` 里 URL 含 `{base}` 的源会用 `RSSHUB_BASE` 拼接，
+未设置时这些源**整批静默跳过**，不影响其它源。两种自建中继方式：
+
+- **wechat2rss（推荐，专做公众号）**：自建 [ttttmr/wechat2rss](https://github.com/ttttmr/wechat2rss)，
+  后台加号即得 `feedId`，URL 写成 `"{base}/feed/<feedId>.xml"`。
+- **RSSHub（通用）**：`docker compose -f docker-compose.rsshub.yml up -d`，URL 用对应 RSSHub 路由
+  （公众号路由通常需 biz id）。
+
+```bash
+export RSSHUB_BASE=http://localhost:1200   # 指向你的中继实例
+# 在 config/sources.yaml 的「微信公众号源」里填好 feedId/路由，把 enabled 改成 true
+```
+
+> 说明：公众号转 RSS 依赖第三方/自建服务，受微信反爬影响偶有不稳；本项目对其失败已做
+> 容错（单源失败自动跳过）。公开 RSSHub 实例（rsshub.app 等）目前对这类请求基本 403，建议自建。
 
 ## 推送通道
 
